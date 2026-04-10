@@ -1,0 +1,15 @@
+{
+  "name": "@scout/validation",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@scout/domain": "workspace:*",
+    "zod": "^4.0.0"
+  }
+}

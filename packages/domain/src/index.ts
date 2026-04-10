@@ -1,0 +1,125 @@
+import { buildLeadShortlist, classifyBusiness } from "./classification.ts";
+import { emptyAuditResult } from "./audit.ts";
+import {
+  buildBusinessBreakdowns,
+  buildRunSummary
+} from "./report.ts";
+import { resolveMarketIntent } from "./query.ts";
+
+import type {
+  PresenceAuditResult,
+  ScoutQueryInput,
+  ScoutRunReport
+} from "./model.ts";
+import type { RunScoutDependencies } from "./search.ts";
+
+export * from "./model.ts";
+export * from "./query.ts";
+export * from "./search.ts";
+export * from "./presence.ts";
+export * from "./audit.ts";
+export * from "./findings.ts";
+export * from "./classification.ts";
+export * from "./report.ts";
+
+function defaultRunId(now: Date): string {
+  return `run_${now.toISOString().replace(/[:.]/g, "-")}`;
+}
+
+function resolveSearchSource(reportProvider: string, fallbackUsed: boolean): string {
+  if (reportProvider === "seeded_stub") {
+    return "seeded_stub";
+  }
+
+  return fallbackUsed ? `${reportProvider} + seeded_stub` : reportProvider;
+}
+
+export async function runScout(
+  input: ScoutQueryInput,
+  dependencies: RunScoutDependencies
+): Promise<ScoutRunReport> {
+  const now = dependencies.now?.() ?? new Date();
+  const runId = dependencies.generateRunId?.() ?? defaultRunId(now);
+  const intent = await dependencies.resolveIntent(input);
+  const acquisition = await dependencies.searchCandidates(intent);
+  const candidates = acquisition.candidates;
+  const presences = await Promise.all(
+    candidates.map((candidate) => dependencies.detectPresence(candidate, intent))
+  );
+
+  const audits: PresenceAuditResult[] = [];
+  for (const presence of presences) {
+    if (!presence.auditEligible) {
+      audits.push(emptyAuditResult(presence.candidateId));
+      continue;
+    }
+
+    audits.push(await dependencies.auditPresence(presence, intent));
+  }
+
+  const findings = audits.flatMap((audit) => audit.findings);
+  const auditedCandidateIds = new Set(
+    presences.filter((presence) => presence.auditEligible).map((presence) => presence.candidateId)
+  );
+  const secondaryTargetsByCandidate = new Map(
+    audits.map((audit) => [
+      audit.candidateId,
+      audit.targets
+        .filter((target) => target.label === "secondary")
+        .map((target) => target.url)
+    ])
+  );
+  const enrichedPresences = presences.map((presence) => ({
+    ...presence,
+    secondaryUrls: secondaryTargetsByCandidate.get(presence.candidateId) ?? presence.secondaryUrls
+  }));
+  const findingsByCandidate = new Map<string, typeof findings>();
+
+  for (const finding of findings) {
+    const current = findingsByCandidate.get(finding.candidateId) ?? [];
+    current.push(finding);
+    findingsByCandidate.set(finding.candidateId, current);
+  }
+
+  const classifications = enrichedPresences.map((presence) =>
+    classifyBusiness(presence, findingsByCandidate.get(presence.candidateId) ?? [])
+  );
+  const shortlist = buildLeadShortlist(enrichedPresences, classifications, findings).slice(0, 5);
+
+  const report: ScoutRunReport = {
+    schemaVersion: 2,
+    runId,
+    status: "completed",
+    createdAt: now.toISOString(),
+    query: input,
+    intent: intent ?? resolveMarketIntent(input),
+    acquisition: acquisition.diagnostics,
+    searchSource: resolveSearchSource(
+      acquisition.diagnostics.provider,
+      acquisition.diagnostics.fallbackUsed
+    ),
+    candidates,
+    presences: enrichedPresences,
+    findings,
+    classifications,
+    businessBreakdowns: buildBusinessBreakdowns(
+      enrichedPresences,
+      classifications,
+      findings,
+      auditedCandidateIds
+    ),
+    shortlist,
+    summary: buildRunSummary(
+      enrichedPresences,
+      classifications,
+      findings,
+      acquisition.diagnostics.sampleQuality,
+      auditedCandidateIds
+    ),
+    notes: audits.flatMap((audit) => audit.notes)
+  };
+
+  await dependencies.onCompleted?.(report);
+
+  return report;
+}

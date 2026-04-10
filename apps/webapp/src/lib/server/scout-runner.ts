@@ -1,0 +1,50 @@
+import {
+  resolveMarketIntent,
+  type ScoutQueryInput,
+  type ScoutRunReport
+} from "@scout/domain";
+
+import {
+  createRunRepository,
+  type PersistedRunRecord,
+  type RecentRunSummary
+} from "./storage/run-repository.ts";
+
+function slugify(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 24);
+}
+
+function createRunId(input: ScoutQueryInput, createdAt: Date): string {
+  const stamp = createdAt.toISOString().replace(/[:.]/g, "-");
+  return `${stamp}-${slugify(input.rawQuery) || "market"}`;
+}
+
+export async function submitScoutRun(input: ScoutQueryInput): Promise<PersistedRunRecord> {
+  const createdAt = new Date();
+  const runId = createRunId(input, createdAt);
+  const repository = createRunRepository();
+  const intent = resolveMarketIntent(input);
+
+  return repository.createQueuedRun({
+    runId,
+    createdAt: createdAt.toISOString(),
+    input,
+    intent
+  });
+}
+
+export async function getScoutRun(runId: string): Promise<ScoutRunReport | null> {
+  return createRunRepository().get(runId);
+}
+
+export async function getScoutRunRecord(runId: string): Promise<PersistedRunRecord | null> {
+  return createRunRepository().getRecord(runId);
+}
+
+export async function listRecentScoutRuns(limit = 6): Promise<RecentRunSummary[]> {
+  return createRunRepository().listRecent(limit);
+}

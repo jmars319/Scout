@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "allowImportingTsExtensions": true,
+    "allowJs": false,
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "forceConsistentCasingInFileNames": true,
+    "baseUrl": ".",
+    "paths": {
+      "@scout/shared-types": ["packages/shared-types/src/index.ts"],
+      "@scout/domain": ["packages/domain/src/index.ts"],
+      "@scout/api-contracts": ["packages/api-contracts/src/index.ts"],
+      "@scout/validation": ["packages/validation/src/index.ts"],
+      "@scout/realtime": ["packages/realtime/src/index.ts"],
+      "@scout/auth": ["packages/auth/src/index.ts"],
+      "@scout/geo": ["packages/geo/src/index.ts"],
+      "@scout/privacy": ["packages/privacy/src/index.ts"],
+      "@scout/ui": ["packages/ui/src/index.tsx"],
+      "@scout/config": ["packages/config/src/index.ts"]
+    }
+  }
+}

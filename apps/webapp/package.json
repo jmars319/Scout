@@ -1,0 +1,30 @@
+{
+  "name": "@scout/webapp",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "worker": "node --no-warnings --experimental-strip-types --experimental-specifier-resolution=node ./src/scripts/worker.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "verify": "pnpm run typecheck && pnpm run build"
+  },
+  "dependencies": {
+    "@axe-core/playwright": "^4.0.0",
+    "@scout/api-contracts": "workspace:*",
+    "@scout/config": "workspace:*",
+    "@scout/domain": "workspace:*",
+    "@scout/privacy": "workspace:*",
+    "@scout/ui": "workspace:*",
+    "@scout/validation": "workspace:*",
+    "cheerio": "^1.2.0",
+    "next": "^16.2.1",
+    "playwright": "^1.58.0",
+    "postgres": "^3.4.7",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "zod": "^4.0.0"
+  }
+}
