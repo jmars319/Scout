@@ -27,6 +27,7 @@
     "verify:acquisition": "node --no-warnings --experimental-strip-types --experimental-specifier-resolution=node ./scripts/verify-acquisition.ts",
     "verify:persistence": "node --no-warnings --experimental-strip-types --experimental-specifier-resolution=node ./scripts/verify-persistence.ts",
     "verify:queue": "node --no-warnings --experimental-strip-types --experimental-specifier-resolution=node ./scripts/verify-queue.ts",
+    "verify:http-smoke": "node --no-warnings --experimental-strip-types --experimental-specifier-resolution=node ./scripts/verify-http-smoke.ts",
     "verify:web": "pnpm run lint && pnpm run typecheck && pnpm run verify:acquisition && pnpm run verify:persistence && pnpm run verify:queue && pnpm run build:web",
     "verify:desktop": "pnpm --filter @scout/desktopapp verify",
     "verify:mobile": "pnpm --filter @scout/mobileapp verify",

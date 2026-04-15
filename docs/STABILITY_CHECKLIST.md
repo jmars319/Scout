@@ -9,6 +9,7 @@
 - `pnpm run db:prepare`
 - `pnpm run verify:persistence`
 - `pnpm run verify:queue`
+- `pnpm run verify:http-smoke`
 - `pnpm run build:web`
 - `pnpm run verify:desktop`
 - `pnpm run verify:mobile`
@@ -30,6 +31,8 @@
   Confirms Postgres connectivity, schema readiness, run write/read behavior, and recent-run retrieval.
 - `verify:queue`
   Confirms queued run creation, worker claim behavior, lifecycle transitions, and failure-note persistence.
+- `verify:http-smoke`
+  Confirms the real HTTP submit and retrieval path: the web server returns a queued response promptly, a worker picks the run up, lifecycle state moves through `queued -> running -> completed`, and the final persisted report is retrievable from the real API.
 - `build:web`
   Confirms the active Next.js app builds successfully.
 - `verify:desktop` and `verify:mobile`
@@ -47,6 +50,7 @@ The repo has been exercised with:
 
 That coverage verifies schema bootstrap, repository persistence, legacy-import handling, screenshot storage, and report retrieval path.
 That coverage also verifies the Postgres-backed queue loop and repository-driven lifecycle updates.
+`verify:http-smoke` adds a real HTTP boundary check without introducing a larger end-to-end framework.
 
 ## Expected Limitations
 

@@ -100,8 +100,12 @@ Run storage and evidence storage both live behind explicit adapters. The worker 
   Applies the schema, creates a queued run record, saves a completed run record, reads it back, checks recent-run retrieval, and deletes the verification row.
 - `pnpm run verify:queue`
   Applies the schema, creates queued runs, verifies worker claim behavior, verifies completed and failed lifecycle transitions, and deletes the verification rows.
+- `pnpm run verify:http-smoke`
+  Starts a temporary Next.js dev server plus a one-shot worker on an isolated local port, warms the real API routes, submits a run through `POST /api/scout/run`, confirms the queued response, waits for `queued -> running -> completed`, retrieves the final report through `GET /api/runs/:runId`, and deletes the verification row plus local evidence.
 - `pnpm run verify:web`
   Runs lint, typecheck, acquisition verification, persistence verification, queue verification, and the web build.
+
+`verify:http-smoke` requires `DATABASE_URL`, local Postgres access, and the Playwright browser installed by `pnpm run bootstrap`. It intentionally forces `SCOUT_SEARCH_PROVIDER=seeded_stub` and smaller candidate limits inside the temporary child processes so the smoke path proves HTTP lifecycle integrity without depending on live DuckDuckGo stability.
 
 ## Inactive App Surfaces
 

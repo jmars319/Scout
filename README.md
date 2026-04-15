@@ -67,6 +67,7 @@ scout/
 - `pnpm run verify:acquisition`
 - `pnpm run verify:persistence`
 - `pnpm run verify:queue`
+- `pnpm run verify:http-smoke`
 - `pnpm run verify:web`
 - `pnpm run verify:desktop`
 - `pnpm run verify:mobile`
@@ -85,6 +86,14 @@ scout/
 8. Normalizes findings into stable issue types with severity, confidence, reproduction notes, and evidence.
 9. Stores structured run data in Postgres and screenshot evidence locally.
 10. Renders the market summary, acquisition diagnostics, business breakdowns, common issues, and shortlist.
+
+## HTTP Smoke Verification
+
+- `pnpm run verify:http-smoke`
+  Starts a temporary local web server and one-shot worker on an isolated port, submits a real HTTP run, confirms the queued response, waits for `queued -> running -> completed`, fetches the final report from the real API, and cleans up the verification row plus local evidence.
+- The smoke verifier uses `SCOUT_SEARCH_PROVIDER=seeded_stub` and smaller candidate limits so it proves the real HTTP lifecycle without depending on DuckDuckGo HTML stability.
+- It proves submission, queue persistence, worker pickup, lifecycle transitions, and final report retrieval.
+- It does not try to prove live provider stability or broad UI coverage.
 
 ## Known Boundaries
 
