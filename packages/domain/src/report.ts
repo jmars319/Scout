@@ -124,6 +124,9 @@ export function createEmptyAcquisitionDiagnostics(provider = "unknown"): Acquisi
     discardedCandidateCount: 0,
     sampleQuality: "weak_sample",
     queryVariants: [],
+    providerAttempts: [],
+    candidateSources: [],
+    fallbackTriggers: [],
     mergedDuplicates: [],
     discardedCandidates: [],
     notes: []

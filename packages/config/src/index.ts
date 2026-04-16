@@ -29,6 +29,8 @@ export interface ScoutLimits {
   maxCandidates: number;
 }
 
+export type SearchProviderName = "duckduckgo_html" | "seeded_stub";
+
 export interface EvidenceStorageConfig {
   driver: "local" | "s3";
   localDir: string;
@@ -57,8 +59,18 @@ export function getScoutLimits(source: Record<string, string | undefined> = proc
   };
 }
 
-export function getSearchProviderName(source: Record<string, string | undefined> = process.env): string {
-  return source.SCOUT_SEARCH_PROVIDER?.trim() || "duckduckgo_html";
+export function getSearchProviderName(
+  source: Record<string, string | undefined> = process.env
+): SearchProviderName {
+  const providerName = source.SCOUT_SEARCH_PROVIDER?.trim() || "duckduckgo_html";
+
+  if (providerName !== "duckduckgo_html" && providerName !== "seeded_stub") {
+    throw new Error(
+      `SCOUT_SEARCH_PROVIDER must be "duckduckgo_html" or "seeded_stub", received "${providerName}".`
+    );
+  }
+
+  return providerName;
 }
 
 export function getEvidenceStorageConfig(

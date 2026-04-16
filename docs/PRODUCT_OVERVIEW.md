@@ -32,6 +32,7 @@ The run is now executed asynchronously:
 ## Deterministic Posture
 
 - Search is provider-based.
+- The live provider seam is intentionally narrow and explicit: Scout isolates provider mechanics, attempt outcomes, and fallback triggers from domain logic.
 - Search acquisition uses light query variants, URL canonicalization, and explicit deduplication before presence typing.
 - Presence typing happens before audit.
 - Presence typing uses URL, domain, redirect, and destination-state rules to reduce false owned-site calls.
@@ -58,7 +59,7 @@ Those opportunities become a shortlist the operator can act on.
 
 The report is intended to make operator judgment faster, not broader.
 
-- acquisition diagnostics explain how the candidate set was assembled and whether fallback was involved
+- acquisition diagnostics explain how the candidate set was assembled, which provider attempts degraded, which sources supplied the kept sample, and whether fallback was involved
 - market sample quality is called out as strong, adequate, partial, or weak
 - market summary explains the search space and the audit/skipped split
 - presence breakdown keeps non-owned, dead, blocked, and unknown presences visible

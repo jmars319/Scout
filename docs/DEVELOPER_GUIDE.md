@@ -41,6 +41,7 @@
 
 - Default provider: DuckDuckGo HTML scrape.
 - Fallback provider: seeded deterministic catalog.
+- Provider seam: explicit adapters return candidates plus structured attempt diagnostics.
 - Query acquisition uses a very small deterministic variant set:
   raw query
   normalized market plus location form
@@ -48,6 +49,17 @@
 - URLs are canonicalized before final candidate selection.
 - Candidates are deduplicated before presence typing and audit.
 - Domain logic never hardcodes a Google-specific assumption.
+- DuckDuckGo degradation is classified explicitly when Scout sees:
+  empty-result pages
+  anti-bot/block-like pages
+  parse failures
+  transient network or HTTP failures
+- Seeded fallback activates only when live acquisition is disabled or when live candidates land below Scout's minimum target count.
+- Acquisition diagnostics now record:
+  provider attempts
+  candidate source contribution counts
+  fallback trigger reasons
+  caution notes tied to live-provider weakness
 
 If live acquisition is weak, partial, or fallback-heavy, Scout records that in acquisition diagnostics and sample-quality notes.
 
@@ -96,6 +108,8 @@ Run storage and evidence storage both live behind explicit adapters. The worker 
 
 - `pnpm run verify:acquisition`
   Runs a small deterministic check over canonicalization, query variants, deduplication, and fallback diagnostics.
+- `pnpm run verify:providers`
+  Verifies the hardened provider seam directly: DuckDuckGo HTML parsing success, empty-result detection, block/degradation detection, parse-failure detection, and fallback-trigger diagnostics under degraded live acquisition.
 - `pnpm run verify:persistence`
   Applies the schema, creates a queued run record, saves a completed run record, reads it back, checks recent-run retrieval, and deletes the verification row.
 - `pnpm run verify:queue`
@@ -106,6 +120,8 @@ Run storage and evidence storage both live behind explicit adapters. The worker 
   Runs lint, typecheck, acquisition verification, persistence verification, queue verification, and the web build.
 
 `verify:http-smoke` requires `DATABASE_URL`, local Postgres access, and the Playwright browser installed by `pnpm run bootstrap`. It intentionally forces `SCOUT_SEARCH_PROVIDER=seeded_stub` and smaller candidate limits inside the temporary child processes so the smoke path proves HTTP lifecycle integrity without depending on live DuckDuckGo stability.
+
+`SCOUT_SEARCH_PROVIDER` is intentionally narrow. Valid values are `duckduckgo_html` and `seeded_stub`.
 
 ## Inactive App Surfaces
 

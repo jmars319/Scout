@@ -1,6 +1,10 @@
 import type { ResolvedMarketIntent } from "@scout/domain";
 
-import type { ProviderSearchCandidate } from "./provider-types.ts";
+import type {
+  ProviderSearchCandidate,
+  ProviderSearchResponse,
+  SearchProviderAdapter
+} from "./provider-types.ts";
 
 const CATALOG: Record<string, ProviderSearchCandidate[]> = {
   restaurant: [
@@ -207,7 +211,7 @@ const CATALOG: Record<string, ProviderSearchCandidate[]> = {
   ]
 };
 
-export function searchSeededFallback(
+function searchSeededFallback(
   intent: ResolvedMarketIntent,
   limit: number
 ): Promise<ProviderSearchCandidate[]> {
@@ -225,4 +229,27 @@ export function searchSeededFallback(
   }
 
   return Promise.resolve(repeated);
+}
+
+export function createSeededFallbackProvider(
+  intent: ResolvedMarketIntent
+): SearchProviderAdapter & {
+  executeQuery: (query: string, limit: number) => Promise<ProviderSearchResponse>;
+} {
+  return {
+    name: "seeded_stub",
+    kind: "fallback",
+    async executeQuery(query, limit) {
+      return {
+        outcome: "success",
+        candidates: await searchSeededFallback(
+          {
+            ...intent,
+            searchQuery: query
+          },
+          limit
+        )
+      };
+    }
+  };
 }

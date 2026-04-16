@@ -94,11 +94,26 @@ async function main(): Promise<void> {
       minCandidates: 5,
       maxCandidates: 6
     },
-    provider: {
-      name: "duckduckgo_html",
-      search: (query: string) => Promise.resolve(liveResults[query] ?? [])
-    },
-    fallbackSearch: () => Promise.resolve(fallbackResults)
+    liveProviders: [
+      {
+        name: "duckduckgo_html",
+        kind: "live",
+        executeQuery: (query: string) =>
+          Promise.resolve({
+            outcome: "success",
+            candidates: liveResults[query] ?? []
+          })
+      }
+    ],
+    fallbackProvider: {
+      name: "seeded_stub",
+      kind: "fallback",
+      executeQuery: () =>
+        Promise.resolve({
+          outcome: "success",
+          candidates: fallbackResults
+        })
+    }
   });
 
   assert.equal(result.diagnostics.mergedDuplicateCount, 3);

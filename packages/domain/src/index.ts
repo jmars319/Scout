@@ -26,12 +26,24 @@ function defaultRunId(now: Date): string {
   return `run_${now.toISOString().replace(/[:.]/g, "-")}`;
 }
 
-function resolveSearchSource(reportProvider: string, fallbackUsed: boolean): string {
-  if (reportProvider === "seeded_stub") {
+function resolveSearchSource(report: ScoutRunReport["acquisition"]): string {
+  const selectedSources = [
+    ...new Set(
+      report.candidateSources
+        .filter((source) => source.selectedCandidateCount > 0)
+        .map((source) => source.source)
+    )
+  ];
+
+  if (selectedSources.length > 0) {
+    return selectedSources.join(" + ");
+  }
+
+  if (report.provider === "seeded_stub") {
     return "seeded_stub";
   }
 
-  return fallbackUsed ? `${reportProvider} + seeded_stub` : reportProvider;
+  return report.fallbackUsed ? `${report.provider} + seeded_stub` : report.provider;
 }
 
 export async function runScout(
@@ -94,10 +106,7 @@ export async function runScout(
     query: input,
     intent: intent ?? resolveMarketIntent(input),
     acquisition: acquisition.diagnostics,
-    searchSource: resolveSearchSource(
-      acquisition.diagnostics.provider,
-      acquisition.diagnostics.fallbackUsed
-    ),
+    searchSource: resolveSearchSource(acquisition.diagnostics),
     candidates,
     presences: enrichedPresences,
     findings,

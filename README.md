@@ -9,7 +9,7 @@ Scout is not a crawler, an SEO suite, or an AI-first app. The v1 product shape i
 - `apps/webapp` is the active product surface.
 - `apps/desktopapp` is scaffold-only for a future operator shell.
 - `apps/mobileapp` is scaffold-only for future expansion.
-- Search uses a provider seam with a live DuckDuckGo HTML implementation and an honest seeded fallback.
+- Search uses a narrow provider seam with a hardened DuckDuckGo HTML adapter and an honest seeded fallback path.
 - Presence typing uses deterministic URL, domain, redirect, and basic destination-state rules before audit.
 - Acquisition now canonicalizes URLs, deduplicates across light query variants, and records sample-quality diagnostics.
 - Runs are stored in Postgres through an explicit repository layer.
@@ -65,6 +65,7 @@ scout/
 - `pnpm run lint`
 - `pnpm run typecheck`
 - `pnpm run verify:acquisition`
+- `pnpm run verify:providers`
 - `pnpm run verify:persistence`
 - `pnpm run verify:queue`
 - `pnpm run verify:http-smoke`
@@ -87,6 +88,13 @@ scout/
 9. Stores structured run data in Postgres and screenshot evidence locally.
 10. Renders the market summary, acquisition diagnostics, business breakdowns, common issues, and shortlist.
 
+## Live Acquisition
+
+- Default live path: DuckDuckGo HTML.
+- Seeded fallback path: deterministic catalog used only when live acquisition is disabled or too weak to hit Scout’s minimum sample threshold.
+- Acquisition diagnostics now record provider attempts, source contribution counts, fallback triggers, and caution notes so the operator can see whether a run was mostly live, partially fallback-assisted, or effectively non-live.
+- Scout still keeps the provider layer intentionally narrow. There is no large multi-vendor search framework here.
+
 ## HTTP Smoke Verification
 
 - `pnpm run verify:http-smoke`
@@ -100,8 +108,10 @@ scout/
 - No deep crawl.
 - No authentication flow.
 - No Redis, BullMQ, or separate cloud worker system.
+- No second live search provider yet.
 - Screenshot evidence is still local-only.
 - The background worker currently uses a simple Postgres-backed queue loop.
+- Live acquisition can still degrade when DuckDuckGo HTML changes or blocks requests, but Scout now records that degradation more explicitly before falling back.
 - No outreach or campaign system.
 - No AI-generated discovery.
 

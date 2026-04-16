@@ -1,4 +1,7 @@
 import {
+  acquisitionAttemptOutcomes,
+  acquisitionFallbackTriggerReasons,
+  acquisitionSourceKinds,
   auditIssueTypes,
   confidenceLevels,
   findingSeverities,
@@ -46,6 +49,30 @@ export const acquisitionQueryVariantSchema = z.object({
   acceptedResultCount: z.number().int().nonnegative()
 });
 
+export const acquisitionProviderAttemptSchema = z.object({
+  provider: z.string(),
+  kind: z.enum(acquisitionSourceKinds),
+  variantLabel: z.string(),
+  query: z.string(),
+  outcome: z.enum(acquisitionAttemptOutcomes),
+  rawResultCount: z.number().int().nonnegative(),
+  httpStatus: z.number().int().positive().optional(),
+  detail: z.string().optional()
+});
+
+export const acquisitionSourceCountSchema = z.object({
+  source: z.string(),
+  kind: z.enum(acquisitionSourceKinds),
+  rawCandidateCount: z.number().int().nonnegative(),
+  selectedCandidateCount: z.number().int().nonnegative()
+});
+
+export const acquisitionFallbackTriggerSchema = z.object({
+  reason: z.enum(acquisitionFallbackTriggerReasons),
+  provider: z.string().optional(),
+  detail: z.string().optional()
+});
+
 export const acquisitionDuplicateRecordSchema = z.object({
   keptCandidateId: z.string(),
   duplicateCandidateId: z.string(),
@@ -68,6 +95,9 @@ export const acquisitionDiagnosticsSchema = z.object({
   discardedCandidateCount: z.number().int().nonnegative(),
   sampleQuality: z.enum(marketSampleQualities),
   queryVariants: z.array(acquisitionQueryVariantSchema),
+  providerAttempts: z.array(acquisitionProviderAttemptSchema).default([]),
+  candidateSources: z.array(acquisitionSourceCountSchema).default([]),
+  fallbackTriggers: z.array(acquisitionFallbackTriggerSchema).default([]),
   mergedDuplicates: z.array(acquisitionDuplicateRecordSchema),
   discardedCandidates: z.array(acquisitionDiscardRecordSchema),
   notes: z.array(z.string())

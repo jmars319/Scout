@@ -32,6 +32,24 @@ export const marketSampleQualities = [
   "partial_sample",
   "weak_sample"
 ] as const;
+export const acquisitionAttemptOutcomes = [
+  "success",
+  "empty",
+  "blocked",
+  "parse_error",
+  "network_error",
+  "http_error"
+] as const;
+export const acquisitionSourceKinds = ["live", "fallback"] as const;
+export const acquisitionFallbackTriggerReasons = [
+  "fallback_only_mode",
+  "insufficient_live_candidates",
+  "provider_empty",
+  "provider_blocked",
+  "provider_parse_failure",
+  "provider_network_error",
+  "provider_http_error"
+] as const;
 
 export const auditIssueTypes = [
   "console_error",
@@ -56,6 +74,9 @@ export type RunStatus = (typeof runStatuses)[number];
 export type ViewportKind = (typeof viewportKinds)[number];
 export type AuditIssueType = (typeof auditIssueTypes)[number];
 export type MarketSampleQuality = (typeof marketSampleQualities)[number];
+export type AcquisitionAttemptOutcome = (typeof acquisitionAttemptOutcomes)[number];
+export type AcquisitionSourceKind = (typeof acquisitionSourceKinds)[number];
+export type AcquisitionFallbackTriggerReason = (typeof acquisitionFallbackTriggerReasons)[number];
 
 export interface ScoutQueryInput {
   rawQuery: string;
@@ -101,6 +122,30 @@ export interface AcquisitionDiscardRecord {
   reason: string;
 }
 
+export interface AcquisitionProviderAttempt {
+  provider: string;
+  kind: AcquisitionSourceKind;
+  variantLabel: string;
+  query: string;
+  outcome: AcquisitionAttemptOutcome;
+  rawResultCount: number;
+  httpStatus?: number | undefined;
+  detail?: string | undefined;
+}
+
+export interface AcquisitionSourceCount {
+  source: string;
+  kind: AcquisitionSourceKind;
+  rawCandidateCount: number;
+  selectedCandidateCount: number;
+}
+
+export interface AcquisitionFallbackTrigger {
+  reason: AcquisitionFallbackTriggerReason;
+  provider?: string | undefined;
+  detail?: string | undefined;
+}
+
 export interface AcquisitionDiagnostics {
   provider: string;
   fallbackUsed: boolean;
@@ -112,6 +157,9 @@ export interface AcquisitionDiagnostics {
   discardedCandidateCount: number;
   sampleQuality: MarketSampleQuality;
   queryVariants: AcquisitionQueryVariant[];
+  providerAttempts: AcquisitionProviderAttempt[];
+  candidateSources: AcquisitionSourceCount[];
+  fallbackTriggers: AcquisitionFallbackTrigger[];
   mergedDuplicates: AcquisitionDuplicateRecord[];
   discardedCandidates: AcquisitionDiscardRecord[];
   notes: string[];

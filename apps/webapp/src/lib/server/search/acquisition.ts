@@ -1,10 +1,11 @@
-import {
-  evaluatePresenceUrl,
-} from "../../../../../../packages/domain/src/presence.ts";
+import { evaluatePresenceUrl } from "../../../../../../packages/domain/src/presence.ts";
 import type {
+  AcquisitionAttemptOutcome,
   AcquisitionDiagnostics,
   AcquisitionDiscardRecord,
   AcquisitionDuplicateRecord,
+  AcquisitionFallbackTrigger,
+  AcquisitionSourceCount,
   MarketSampleQuality,
   ResolvedMarketIntent,
   ScoutAcquisitionResult,
@@ -16,13 +17,12 @@ import {
   canonicalizeUrl,
   titlesLookEquivalent
 } from "./canonicalize.ts";
-import type { ProviderSearchCandidate } from "./provider-types.ts";
+import type {
+  ProviderSearchCandidate,
+  ProviderSearchResponse,
+  SearchProviderAdapter
+} from "./provider-types.ts";
 import { buildQueryVariants } from "./query-variants.ts";
-
-interface SearchClient {
-  name: string;
-  search: (query: string, limit: number) => Promise<ProviderSearchCandidate[]>;
-}
 
 interface SearchLimits {
   minCandidates: number;
@@ -40,6 +40,14 @@ interface RawAcquisitionCandidate extends ProviderSearchCandidate {
   comparisonKey: string;
   businessKey: string;
   presenceHint: ReturnType<typeof evaluatePresenceUrl>["type"];
+}
+
+interface VariantAccumulator {
+  label: string;
+  query: string;
+  rawResultCount: number;
+  acceptedResultCount: number;
+  sources: Set<string>;
 }
 
 function slugify(value: string): string {
@@ -195,23 +203,108 @@ function shouldDeferLowSignalCandidate(
   return selectedLowSignalCount >= lowSignalCap && remainingHigherValue;
 }
 
+function isProviderDegraded(outcome: AcquisitionAttemptOutcome): boolean {
+  return outcome !== "success" && outcome !== "empty";
+}
+
+function mapOutcomeToFallbackReason(
+  outcome: AcquisitionAttemptOutcome
+): AcquisitionFallbackTrigger["reason"] | null {
+  if (outcome === "empty") {
+    return "provider_empty";
+  }
+
+  if (outcome === "blocked") {
+    return "provider_blocked";
+  }
+
+  if (outcome === "parse_error") {
+    return "provider_parse_failure";
+  }
+
+  if (outcome === "network_error") {
+    return "provider_network_error";
+  }
+
+  if (outcome === "http_error") {
+    return "provider_http_error";
+  }
+
+  return null;
+}
+
+function summarizeFallbackTriggers(input: {
+  liveAttempts: AcquisitionDiagnostics["providerAttempts"];
+  useFallbackOnly: boolean;
+  liveCandidateCount: number;
+  limits: SearchLimits;
+}): AcquisitionFallbackTrigger[] {
+  const triggers: AcquisitionFallbackTrigger[] = [];
+
+  if (input.useFallbackOnly) {
+    triggers.push({
+      reason: "fallback_only_mode",
+      detail: "Scout was configured to skip live acquisition for this run."
+    });
+    return triggers;
+  }
+
+  if (input.liveCandidateCount < input.limits.minCandidates) {
+    triggers.push({
+      reason: "insufficient_live_candidates",
+      detail: `Live acquisition kept ${input.liveCandidateCount} candidates before the seeded fallback catalog was used.`
+    });
+  }
+
+  const seenDegradations = new Set<string>();
+  for (const attempt of input.liveAttempts) {
+    const reason = mapOutcomeToFallbackReason(attempt.outcome);
+    if (!reason) {
+      continue;
+    }
+
+    const key = `${attempt.provider}:${reason}`;
+    if (seenDegradations.has(key)) {
+      continue;
+    }
+
+    seenDegradations.add(key);
+    triggers.push({
+      reason,
+      provider: attempt.provider,
+      ...(attempt.detail ? { detail: attempt.detail } : {})
+    });
+  }
+
+  return triggers;
+}
+
 function determineSampleQuality(input: {
   limits: SearchLimits;
   selected: RawAcquisitionCandidate[];
   fallbackUsed: boolean;
   notes: string[];
+  providerAttempts: AcquisitionDiagnostics["providerAttempts"];
 }): MarketSampleQuality {
   const selectedCount = input.selected.length;
   const liveCount = input.selected.filter((candidate) => candidate.acquisitionKind === "live").length;
+  const fallbackCount = input.selected.filter(
+    (candidate) => candidate.acquisitionKind === "fallback"
+  ).length;
   const lowSignalRatio =
     selectedCount > 0
       ? input.selected.filter((candidate) => isLowSignalPresence(candidate.presenceHint)).length /
         selectedCount
       : 1;
+  const fallbackRatio = selectedCount > 0 ? fallbackCount / selectedCount : 0;
+  const providerDegraded = input.providerAttempts.some(
+    (attempt) => attempt.kind === "live" && isProviderDegraded(attempt.outcome)
+  );
 
   if (
     selectedCount < Math.ceil(input.limits.minCandidates / 2) ||
     (liveCount === 0 && input.fallbackUsed) ||
+    fallbackRatio >= 0.7 ||
     lowSignalRatio >= 0.7
   ) {
     return "weak_sample";
@@ -220,7 +313,9 @@ function determineSampleQuality(input: {
   if (
     selectedCount < input.limits.minCandidates ||
     liveCount / Math.max(selectedCount, 1) < 0.5 ||
-    lowSignalRatio >= 0.5
+    fallbackRatio >= 0.4 ||
+    lowSignalRatio >= 0.5 ||
+    providerDegraded
   ) {
     return "partial_sample";
   }
@@ -228,6 +323,7 @@ function determineSampleQuality(input: {
   if (
     selectedCount >= Math.min(input.limits.maxCandidates, input.limits.minCandidates + 2) &&
     liveCount / selectedCount >= 0.75 &&
+    fallbackCount === 0 &&
     lowSignalRatio <= 0.35 &&
     input.notes.length <= 1
   ) {
@@ -235,6 +331,45 @@ function determineSampleQuality(input: {
   }
 
   return "adequate_sample";
+}
+
+function buildCandidateSourceBreakdown(
+  rawCandidates: RawAcquisitionCandidate[],
+  selected: RawAcquisitionCandidate[]
+): AcquisitionSourceCount[] {
+  const sourceCounts = new Map<string, AcquisitionSourceCount>();
+
+  const ensureSource = (candidate: RawAcquisitionCandidate): AcquisitionSourceCount => {
+    const existing = sourceCounts.get(candidate.source);
+    if (existing) {
+      return existing;
+    }
+
+    const created: AcquisitionSourceCount = {
+      source: candidate.source,
+      kind: candidate.acquisitionKind,
+      rawCandidateCount: 0,
+      selectedCandidateCount: 0
+    };
+    sourceCounts.set(candidate.source, created);
+    return created;
+  };
+
+  for (const candidate of rawCandidates) {
+    ensureSource(candidate).rawCandidateCount += 1;
+  }
+
+  for (const candidate of selected) {
+    ensureSource(candidate).selectedCandidateCount += 1;
+  }
+
+  return [...sourceCounts.values()].sort(
+    (left, right) =>
+      Number(left.kind === "fallback") - Number(right.kind === "fallback") ||
+      right.selectedCandidateCount - left.selectedCandidateCount ||
+      right.rawCandidateCount - left.rawCandidateCount ||
+      left.source.localeCompare(right.source)
+  );
 }
 
 function buildDiagnosticsNotes(input: {
@@ -245,9 +380,10 @@ function buildDiagnosticsNotes(input: {
   fallbackUsed: boolean;
   mergedCount: number;
   discardedCount: number;
-  providerIssues: string[];
+  providerAttempts: AcquisitionDiagnostics["providerAttempts"];
+  fallbackTriggers: AcquisitionFallbackTrigger[];
 }): string[] {
-  const notes = [...input.providerIssues];
+  const notes: string[] = [];
   const liveCount = input.selected.filter((candidate) => candidate.acquisitionKind === "live").length;
   const fallbackCount = input.selected.filter(
     (candidate) => candidate.acquisitionKind === "fallback"
@@ -257,11 +393,44 @@ function buildDiagnosticsNotes(input: {
   ).length;
 
   if (!input.intent.locationLabel) {
-    notes.push("No explicit location was resolved from the query, so the market slice may be broader than intended.");
+    notes.push(
+      "No explicit location was resolved from the query, so the market slice may be broader than intended."
+    );
   }
 
   if (input.intent.categories.includes("general_local_business")) {
-    notes.push("Scout could not resolve a strong vertical from the query and used a generic local-business interpretation.");
+    notes.push(
+      "Scout could not resolve a strong vertical from the query and used a generic local-business interpretation."
+    );
+  }
+
+  if (input.fallbackTriggers.some((trigger) => trigger.reason === "fallback_only_mode")) {
+    notes.push("Scout was configured to use only the seeded fallback catalog for this run.");
+  }
+
+  if (input.providerAttempts.some((attempt) => attempt.kind === "live" && attempt.outcome === "blocked")) {
+    notes.push("The live provider showed signs of blocking or degraded access during acquisition.");
+  }
+
+  if (
+    input.providerAttempts.some((attempt) => attempt.kind === "live" && attempt.outcome === "parse_error")
+  ) {
+    notes.push("Scout received at least one live provider page it could not parse cleanly.");
+  }
+
+  if (
+    input.providerAttempts.some((attempt) =>
+      attempt.kind === "live" &&
+      (attempt.outcome === "network_error" || attempt.outcome === "http_error")
+    )
+  ) {
+    notes.push("At least one live provider attempt failed before Scout could gather a stable result set.");
+  }
+
+  if (
+    input.providerAttempts.some((attempt) => attempt.kind === "live" && attempt.outcome === "empty")
+  ) {
+    notes.push("At least one live provider attempt returned no results for its query variant.");
   }
 
   if (input.fallbackUsed && liveCount === 0) {
@@ -270,12 +439,20 @@ function buildDiagnosticsNotes(input: {
     notes.push("Fallback candidates were used to fill gaps after live acquisition and consolidation.");
   }
 
+  if (fallbackCount > 0 && fallbackCount >= Math.max(1, liveCount)) {
+    notes.push(
+      "Seeded fallback contributed as much or more of the kept sample as live acquisition, so treat the market picture cautiously."
+    );
+  }
+
   if (input.selected.length < input.limits.minCandidates) {
     notes.push("The final market sample landed below the minimum target candidate count.");
   }
 
   if (input.rawCandidateCount > 0 && input.discardedCount / input.rawCandidateCount >= 0.35) {
-    notes.push("A meaningful share of gathered results were discarded as low-value or non-specific search pages.");
+    notes.push(
+      "A meaningful share of gathered results were discarded as low-value or non-specific search pages."
+    );
   }
 
   if (input.selected.length > 0 && lowSignalCount / input.selected.length >= 0.5) {
@@ -286,7 +463,7 @@ function buildDiagnosticsNotes(input: {
     notes.push("Multiple overlapping candidates were merged across query variants before final selection.");
   }
 
-  return notes;
+  return [...new Set(notes)];
 }
 
 function toSearchCandidate(candidate: RawAcquisitionCandidate, rank: number): SearchCandidate {
@@ -301,54 +478,100 @@ function toSearchCandidate(candidate: RawAcquisitionCandidate, rank: number): Se
   };
 }
 
+function ensureVariantAccumulator(
+  variantStats: Map<string, VariantAccumulator>,
+  label: string,
+  query: string
+): VariantAccumulator {
+  const existing = variantStats.get(label);
+  if (existing) {
+    return existing;
+  }
+
+  const created: VariantAccumulator = {
+    label,
+    query,
+    rawResultCount: 0,
+    acceptedResultCount: 0,
+    sources: new Set()
+  };
+  variantStats.set(label, created);
+  return created;
+}
+
+function recordProviderAttempt(input: {
+  attempts: AcquisitionDiagnostics["providerAttempts"];
+  provider: SearchProviderAdapter;
+  variantLabel: string;
+  query: string;
+  response: ProviderSearchResponse;
+}): void {
+  input.attempts.push({
+    provider: input.provider.name,
+    kind: input.provider.kind,
+    variantLabel: input.variantLabel,
+    query: input.query,
+    outcome: input.response.outcome,
+    rawResultCount: input.response.candidates.length,
+    ...(input.response.httpStatus ? { httpStatus: input.response.httpStatus } : {}),
+    ...(input.response.detail ? { detail: input.response.detail } : {})
+  });
+}
+
 export async function acquireCandidates(input: {
   intent: ResolvedMarketIntent;
-  provider: SearchClient;
+  liveProviders: SearchProviderAdapter[];
   limits: SearchLimits;
   useFallbackOnly?: boolean;
-  fallbackSearch: (intent: ResolvedMarketIntent, limit: number) => Promise<ProviderSearchCandidate[]>;
+  fallbackProvider: SearchProviderAdapter;
 }): Promise<ScoutAcquisitionResult> {
   const queryVariants = buildQueryVariants(input.intent);
-  const variantStats = new Map(
+  const variantStats = new Map<string, VariantAccumulator>(
     queryVariants.map((variant) => [
       variant.label,
       {
         label: variant.label,
         query: variant.query,
-        source: input.provider.name,
         rawResultCount: 0,
-        acceptedResultCount: 0
+        acceptedResultCount: 0,
+        sources: new Set<string>()
       }
     ])
   );
   const rawCandidates: RawAcquisitionCandidate[] = [];
   const discardedCandidates: AcquisitionDiscardRecord[] = [];
   const mergedDuplicates: AcquisitionDuplicateRecord[] = [];
-  const providerIssues: string[] = [];
+  const providerAttempts: AcquisitionDiagnostics["providerAttempts"] = [];
   let rawSequence = 0;
 
   if (!input.useFallbackOnly) {
     for (const variant of queryVariants) {
-      try {
-        const results = await input.provider.search(variant.query, input.limits.maxCandidates);
-        const variantStat = variantStats.get(variant.label);
-        if (variantStat) {
-          variantStat.rawResultCount += results.length;
+      const variantStat = ensureVariantAccumulator(variantStats, variant.label, variant.query);
+
+      for (const provider of input.liveProviders) {
+        const response = await provider.executeQuery(variant.query, input.limits.maxCandidates);
+        recordProviderAttempt({
+          attempts: providerAttempts,
+          provider,
+          variantLabel: variant.label,
+          query: variant.query,
+          response
+        });
+
+        variantStat.sources.add(provider.name);
+        variantStat.rawResultCount += response.candidates.length;
+
+        if (response.outcome !== "success") {
+          continue;
         }
 
-        for (const [index, result] of results.entries()) {
+        for (const [index, result] of response.candidates.entries()) {
           rawCandidates.push(
-            buildRawCandidate(result, rawSequence + index, "live", variant.query, variant.label)
+            buildRawCandidate(result, rawSequence + index, provider.kind, variant.query, variant.label)
           );
         }
 
-        rawSequence += results.length;
-      } catch (error) {
-        providerIssues.push(
-          `${input.provider.name} failed for "${variant.query}": ${
-            error instanceof Error ? error.message : "Unknown provider error."
-          }`
-        );
+        rawSequence += response.candidates.length;
       }
     }
   }
@@ -389,30 +612,40 @@ export async function acquireCandidates(input: {
 
   let fallbackUsed = Boolean(input.useFallbackOnly);
 
-  if (uniqueCandidates.length < input.limits.minCandidates) {
-    const fallbackResults = await input.fallbackSearch(input.intent, input.limits.maxCandidates);
+  if (uniqueCandidates.length < input.limits.minCandidates || input.useFallbackOnly) {
+    const fallbackVariantLabel = "fallback_catalog";
+    const fallbackQuery = input.intent.searchQuery;
+    const fallbackStat = ensureVariantAccumulator(
+      variantStats,
+      fallbackVariantLabel,
+      fallbackQuery
+    );
+    const fallbackResponse = await input.fallbackProvider.executeQuery(
+      fallbackQuery,
+      input.limits.maxCandidates
+    );
+
+    recordProviderAttempt({
+      attempts: providerAttempts,
+      provider: input.fallbackProvider,
+      variantLabel: fallbackVariantLabel,
+      query: fallbackQuery,
+      response: fallbackResponse
+    });
+
     fallbackUsed = true;
+    fallbackStat.sources.add(input.fallbackProvider.name);
+    fallbackStat.rawResultCount += fallbackResponse.candidates.length;
 
-    const fallbackStatKey = "fallback_catalog";
-    const existingFallbackStat = variantStats.get(fallbackStatKey);
-    if (!existingFallbackStat) {
-      variantStats.set(fallbackStatKey, {
-        label: fallbackStatKey,
-        query: input.intent.searchQuery,
-        source: "seeded_stub",
-        rawResultCount: fallbackResults.length,
-        acceptedResultCount: 0
-      });
-    }
-
-    for (const [index, result] of fallbackResults.entries()) {
+    for (const [index, result] of fallbackResponse.candidates.entries()) {
       const candidate = buildRawCandidate(
         result,
         rawSequence + index,
-        "fallback",
-        input.intent.searchQuery,
-        fallbackStatKey
+        input.fallbackProvider.kind,
+        fallbackQuery,
+        fallbackVariantLabel
       );
+      rawCandidates.push(candidate);
       const discardReason = getDiscardReason(candidate);
       if (discardReason) {
         discardedCandidates.push({
@@ -444,11 +677,12 @@ export async function acquireCandidates(input: {
       uniqueCandidates.push(candidate);
     }
 
-    rawSequence += fallbackResults.length;
+    rawSequence += fallbackResponse.candidates.length;
   }
 
   const rankedCandidates = [...uniqueCandidates].sort(
-    (left, right) => getPreferenceScore(right) - getPreferenceScore(left) || left.title.localeCompare(right.title)
+    (left, right) =>
+      getPreferenceScore(right) - getPreferenceScore(left) || left.title.localeCompare(right.title)
   );
   const selected: RawAcquisitionCandidate[] = [];
   const deferred: RawAcquisitionCandidate[] = [];
@@ -482,6 +716,12 @@ export async function acquireCandidates(input: {
     }
   }
 
+  const fallbackTriggers = summarizeFallbackTriggers({
+    liveAttempts: providerAttempts.filter((attempt) => attempt.kind === "live"),
+    useFallbackOnly: Boolean(input.useFallbackOnly),
+    liveCandidateCount: uniqueCandidates.filter((candidate) => candidate.acquisitionKind === "live").length,
+    limits: input.limits
+  });
   const diagnosticsNotes = buildDiagnosticsNotes({
     intent: input.intent,
     limits: input.limits,
@@ -490,10 +730,11 @@ export async function acquireCandidates(input: {
     fallbackUsed,
     mergedCount: mergedDuplicates.length,
     discardedCount: discardedCandidates.length,
-    providerIssues
+    providerAttempts,
+    fallbackTriggers
   });
   const diagnostics: AcquisitionDiagnostics = {
-    provider: input.provider.name,
+    provider: input.liveProviders[0]?.name ?? input.fallbackProvider.name,
     fallbackUsed,
     rawCandidateCount: rawSequence,
     selectedCandidateCount: selected.length,
@@ -505,9 +746,22 @@ export async function acquireCandidates(input: {
       limits: input.limits,
       selected,
       fallbackUsed,
-      notes: diagnosticsNotes
+      notes: diagnosticsNotes,
+      providerAttempts
     }),
-    queryVariants: [...variantStats.values()],
+    queryVariants: [...variantStats.values()].map((variant) => ({
+      label: variant.label,
+      query: variant.query,
+      source:
+        variant.sources.size > 1
+          ? [...variant.sources].sort().join(" + ")
+          : [...variant.sources][0] ?? "unresolved",
+      rawResultCount: variant.rawResultCount,
+      acceptedResultCount: variant.acceptedResultCount
+    })),
+    providerAttempts,
+    candidateSources: buildCandidateSourceBreakdown(rawCandidates, selected),
+    fallbackTriggers,
     mergedDuplicates,
     discardedCandidates,
     notes: diagnosticsNotes

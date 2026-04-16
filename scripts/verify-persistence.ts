@@ -1,3 +1,4 @@
+import { createEmptyAcquisitionDiagnostics } from "../packages/domain/src/report.ts";
 import { resolveMarketIntent } from "../packages/domain/src/query.ts";
 import type { ScoutRunReport } from "../packages/domain/src/model.ts";
 
@@ -16,21 +17,7 @@ const query = {
   rawQuery: "persistence smoke check"
 };
 const intent = resolveMarketIntent(query);
-const acquisition = {
-  provider: "verification",
-  fallbackUsed: false,
-  rawCandidateCount: 0,
-  selectedCandidateCount: 0,
-  liveCandidateCount: 0,
-  fallbackCandidateCount: 0,
-  mergedDuplicateCount: 0,
-  discardedCandidateCount: 0,
-  sampleQuality: "weak_sample" as const,
-  queryVariants: [],
-  mergedDuplicates: [],
-  discardedCandidates: [],
-  notes: []
-};
+const acquisition = createEmptyAcquisitionDiagnostics("verification");
 
 try {
   await applyScoutSchema();

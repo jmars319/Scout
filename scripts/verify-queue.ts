@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 
 import type { ScoutRunReport } from "../packages/domain/src/model.ts";
 import { resolveMarketIntent } from "../packages/domain/src/query.ts";
+import { createEmptyAcquisitionDiagnostics } from "../packages/domain/src/report.ts";
 import { getPostgresClient } from "../apps/webapp/src/lib/server/storage/postgres-client.ts";
 import { createRunRepository } from "../apps/webapp/src/lib/server/storage/run-repository.ts";
 import { processNextQueuedRun } from "../apps/webapp/src/lib/server/worker/scout-worker.ts";
@@ -24,21 +25,7 @@ function buildVerificationReport(runId: string, createdAt: string): ScoutRunRepo
     createdAt,
     query,
     intent,
-    acquisition: {
-      provider: "verification",
-      fallbackUsed: false,
-      rawCandidateCount: 0,
-      selectedCandidateCount: 0,
-      liveCandidateCount: 0,
-      fallbackCandidateCount: 0,
-      mergedDuplicateCount: 0,
-      discardedCandidateCount: 0,
-      sampleQuality: "weak_sample",
-      queryVariants: [],
-      mergedDuplicates: [],
-      discardedCandidates: [],
-      notes: []
-    },
+    acquisition: createEmptyAcquisitionDiagnostics("verification"),
     searchSource: "verification",
     candidates: [],
     presences: [],

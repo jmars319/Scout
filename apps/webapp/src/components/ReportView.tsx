@@ -70,6 +70,51 @@ function toneForSampleQuality(sampleQuality: ScoutRunReport["summary"]["sampleQu
   return "danger";
 }
 
+function toneForAcquisitionTrust(report: ScoutRunReport): "neutral" | "good" | "warn" | "danger" {
+  const degradedLiveAttempt = report.acquisition.providerAttempts.some(
+    (attempt) => attempt.kind === "live" && attempt.outcome !== "success" && attempt.outcome !== "empty"
+  );
+
+  if (!report.acquisition.fallbackUsed && !degradedLiveAttempt) {
+    return "good";
+  }
+
+  if (
+    report.acquisition.liveCandidateCount === 0 ||
+    report.acquisition.fallbackCandidateCount >= Math.max(1, report.acquisition.liveCandidateCount)
+  ) {
+    return "danger";
+  }
+
+  return "warn";
+}
+
+function describeAcquisitionTrust(report: ScoutRunReport): string {
+  const degradedLiveAttempt = report.acquisition.providerAttempts.some(
+    (attempt) => attempt.kind === "live" && attempt.outcome !== "success" && attempt.outcome !== "empty"
+  );
+
+  if (!report.acquisition.fallbackUsed && !degradedLiveAttempt) {
+    return "Live acquisition carried this run without seeded help.";
+  }
+
+  if (report.acquisition.liveCandidateCount === 0) {
+    return "This run is effectively non-live. Scout had to rely on the seeded fallback catalog.";
+  }
+
+  if (
+    report.acquisition.fallbackCandidateCount >= Math.max(1, report.acquisition.liveCandidateCount)
+  ) {
+    return "Seeded fallback contributed as much or more of the kept sample as live acquisition.";
+  }
+
+  if (degradedLiveAttempt) {
+    return "Live acquisition worked only partially. Provider degradation should reduce confidence in the market picture.";
+  }
+
+  return "Live acquisition needed seeded help to fill gaps in the final sample.";
+}
+
 function groupFindings(findings: AuditFinding[]): Map<string, AuditFinding[]> {
   const grouped = new Map<string, AuditFinding[]>();
 
@@ -113,6 +158,12 @@ export function ReportView({ report }: { report: ScoutRunReport }) {
   ).length;
   const acquisitionVariants = report.acquisition.queryVariants.filter(
     (variant) => variant.rawResultCount > 0 || variant.acceptedResultCount > 0
+  );
+  const acquisitionSources = report.acquisition.candidateSources.filter(
+    (source) => source.rawCandidateCount > 0 || source.selectedCandidateCount > 0
+  );
+  const degradedLiveAttempts = report.acquisition.providerAttempts.filter(
+    (attempt) => attempt.kind === "live" && attempt.outcome !== "success"
   );
 
   return (
@@ -198,12 +249,16 @@ export function ReportView({ report }: { report: ScoutRunReport }) {
 
         <Panel title="Acquisition">
           <div className="tag-row" style={{ marginBottom: "0.9rem" }}>
-            <Tag tone="good">{report.acquisition.provider}</Tag>
+            <Tag tone={toneForAcquisitionTrust(report)}>{report.acquisition.provider}</Tag>
             {report.acquisition.fallbackUsed ? <Tag tone="warn">Fallback Used</Tag> : null}
             <Tag tone={toneForSampleQuality(report.acquisition.sampleQuality)}>
               {humanize(report.acquisition.sampleQuality)}
             </Tag>
           </div>
+
+          <p className="muted" style={{ marginTop: 0, marginBottom: "0.9rem", lineHeight: 1.65 }}>
+            {describeAcquisitionTrust(report)}
+          </p>
 
           <p className="muted" style={{ marginTop: 0, lineHeight: 1.65 }}>
             Scout gathered <strong>{report.acquisition.rawCandidateCount}</strong> raw results,
@@ -218,6 +273,14 @@ export function ReportView({ report }: { report: ScoutRunReport }) {
             <Tag tone={report.acquisition.fallbackCandidateCount > 0 ? "warn" : "neutral"}>
               Fallback {report.acquisition.fallbackCandidateCount}
             </Tag>
+            {acquisitionSources.map((source) => (
+              <Tag
+                key={source.source}
+                tone={source.kind === "fallback" ? "warn" : "neutral"}
+              >
+                {source.source} kept {source.selectedCandidateCount}
+              </Tag>
+            ))}
           </div>
 
           <div className="section-stack" style={{ marginTop: "1rem" }}>
@@ -249,6 +312,58 @@ export function ReportView({ report }: { report: ScoutRunReport }) {
               </p>
             )}
           </div>
+
+          {acquisitionSources.length > 0 ? (
+            <div className="section-stack" style={{ marginTop: "1rem" }}>
+              <div className="section-label">Source Contribution</div>
+              <table className="finding-table">
+                <thead>
+                  <tr>
+                    <th>Source</th>
+                    <th>Kind</th>
+                    <th>Raw</th>
+                    <th>Kept</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {acquisitionSources.map((source) => (
+                    <tr key={`${source.kind}-${source.source}`}>
+                      <td>{source.source}</td>
+                      <td>{humanize(source.kind)}</td>
+                      <td>{source.rawCandidateCount}</td>
+                      <td>{source.selectedCandidateCount}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+
+          {degradedLiveAttempts.length > 0 ? (
+            <div className="section-stack" style={{ marginTop: "1rem" }}>
+              <div className="section-label">Live Provider Attempts</div>
+              <table className="finding-table">
+                <thead>
+                  <tr>
+                    <th>Provider</th>
+                    <th>Variant</th>
+                    <th>Outcome</th>
+                    <th>Raw</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {degradedLiveAttempts.map((attempt) => (
+                    <tr key={`${attempt.provider}-${attempt.variantLabel}-${attempt.query}-${attempt.outcome}`}>
+                      <td>{attempt.provider}</td>
+                      <td>{humanize(attempt.variantLabel)}</td>
+                      <td>{humanize(attempt.outcome)}</td>
+                      <td>{attempt.rawResultCount}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
 
           {report.acquisition.notes.length > 0 ? (
             <div className="section-stack" style={{ marginTop: "1rem" }}>

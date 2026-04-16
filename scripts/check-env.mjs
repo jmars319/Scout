@@ -28,6 +28,7 @@ const minCandidates = parseNumber("SCOUT_MIN_CANDIDATES", 10);
 const maxCandidates = parseNumber("SCOUT_MAX_CANDIDATES", 15);
 const workerPollMs = parseNumber("SCOUT_WORKER_POLL_MS", 2000);
 const workerStaleRunMs = parseNumber("SCOUT_WORKER_STALE_RUN_MS", 2_700_000);
+const searchProvider = env.SCOUT_SEARCH_PROVIDER || "duckduckgo_html";
 
 if (minCandidates < 1) {
   throw new Error("SCOUT_MIN_CANDIDATES must be at least 1.");
@@ -43,6 +44,10 @@ if (workerPollMs < 250) {
 
 if (workerStaleRunMs < workerPollMs) {
   throw new Error("SCOUT_WORKER_STALE_RUN_MS must be greater than or equal to SCOUT_WORKER_POLL_MS.");
+}
+
+if (!["duckduckgo_html", "seeded_stub"].includes(searchProvider)) {
+  throw new Error("SCOUT_SEARCH_PROVIDER must be `duckduckgo_html` or `seeded_stub`.");
 }
 
 const evidenceDriver = env.EVIDENCE_STORAGE_DRIVER || "local";
