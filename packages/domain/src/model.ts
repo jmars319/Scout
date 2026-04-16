@@ -24,6 +24,8 @@ export const confidenceLevels = ["confirmed", "probable", "inferred"] as const;
 
 export const findingSeverities = ["low", "medium", "high", "critical"] as const;
 export const runStatuses = ["queued", "running", "completed", "failed"] as const;
+export const outreachTones = ["calm", "direct", "friendly"] as const;
+export const outreachLengths = ["brief", "standard"] as const;
 
 export const viewportKinds = ["desktop", "mobile"] as const;
 export const marketSampleQualities = [
@@ -71,6 +73,8 @@ export type OpportunityType = (typeof opportunityTypes)[number];
 export type ConfidenceLevel = (typeof confidenceLevels)[number];
 export type FindingSeverity = (typeof findingSeverities)[number];
 export type RunStatus = (typeof runStatuses)[number];
+export type OutreachTone = (typeof outreachTones)[number];
+export type OutreachLength = (typeof outreachLengths)[number];
 export type ViewportKind = (typeof viewportKinds)[number];
 export type AuditIssueType = (typeof auditIssueTypes)[number];
 export type MarketSampleQuality = (typeof marketSampleQualities)[number];
@@ -281,4 +285,20 @@ export interface ScoutRunReport {
   summary: ScoutRunSummary;
   notes: string[];
   errorMessage?: string;
+}
+
+export interface OutreachDraft {
+  draftId: string;
+  runId: string;
+  candidateId: string;
+  businessName: string;
+  primaryUrl: string;
+  tone: OutreachTone;
+  length: OutreachLength;
+  subjectLine: string;
+  body: string;
+  grounding: string[];
+  createdAt: string;
+  updatedAt: string;
+  model?: string | undefined;
 }

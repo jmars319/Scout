@@ -7,9 +7,10 @@ Scout is not a crawler, an SEO suite, or an AI-first app. The v1 product shape i
 ## Current MVP State
 
 - `apps/webapp` is the active product surface.
-- `apps/desktopapp` is now an active Electron shell that wraps the local web app and worker in a native desktop window.
+- `apps/desktopapp` is now the primary product surface. It wraps the local web app and worker in a native desktop window.
 - `apps/mobileapp` is scaffold-only for future expansion.
 - Search uses a narrow provider seam with hardened DuckDuckGo HTML, Google Search, and Bing HTML adapters. Live runs no longer backfill seeded candidates.
+- Completed runs can now save local outreach drafts for shortlisted businesses, with optional OpenAI-assisted generation grounded on stored Scout evidence.
 - Presence typing uses deterministic URL, domain, redirect, and basic destination-state rules before audit.
 - Acquisition now canonicalizes URLs, deduplicates across light query variants, and records sample-quality diagnostics.
 - Runs are stored in Postgres through an explicit repository layer.
@@ -70,6 +71,7 @@ scout/
 - `pnpm run typecheck`
 - `pnpm run verify:acquisition`
 - `pnpm run verify:providers`
+- `pnpm run verify:outreach`
 - `pnpm run verify:persistence`
 - `pnpm run verify:queue`
 - `pnpm run verify:http-smoke`
@@ -109,6 +111,7 @@ scout/
   Removes the interactive-search profile, the desktop cleanup marker, and local screenshot evidence. Postgres run history is not deleted.
 - The desktop app does not fork the product into a second surface. It wraps the same repository-backed web flow:
   input, queued run, worker execution, report.
+- Completed report views now include a local outreach workspace for shortlist targets. Drafts can be generated with OpenAI, edited manually, saved locally, and copied out, but Scout still does not send outreach automatically.
 - The packaged macOS app runs its own bundled `next start` server, bundled worker runtime, and bundled Chromium for audits.
 - Desktop mode also enables manual in-browser confirmation for blocked live-search challenges. If DuckDuckGo or Google serves a human-check page, Scout opens a local browser-backed search window and continues the run after the operator clears it.
 - The packaged app still needs `DATABASE_URL`. When launched outside a shell, it reads env from `~/Library/Application Support/Scout by JAMARQ/.env` or from `Scout.app/Contents/Resources/scout.env` if you place one there before launch.
@@ -138,7 +141,7 @@ scout/
 - Screenshot evidence is still local-only.
 - The background worker currently uses a simple Postgres-backed queue loop.
 - Live acquisition can still degrade when DuckDuckGo HTML, Google Search, or Bing HTML change or block requests, but Scout now records that degradation and fails without substituting seeded market results.
-- No outreach or campaign system.
+- No outreach automation or campaign system.
 - No AI-generated discovery.
 
 See [docs/PRODUCT_OVERVIEW.md](/Users/jason_marshall/JAMARQ/Side Projects/Scout/docs/PRODUCT_OVERVIEW.md), [docs/MVP_SCOPE.md](/Users/jason_marshall/JAMARQ/Side Projects/Scout/docs/MVP_SCOPE.md), and [docs/DEVELOPER_GUIDE.md](/Users/jason_marshall/JAMARQ/Side Projects/Scout/docs/DEVELOPER_GUIDE.md) for the actual implementation details.

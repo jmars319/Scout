@@ -8,6 +8,7 @@
 - `pnpm run typecheck`
 - `pnpm run db:prepare`
 - `pnpm run verify:providers`
+- `pnpm run verify:outreach`
 - `pnpm run verify:persistence`
 - `pnpm run verify:queue`
 - `pnpm run verify:http-smoke`
@@ -31,6 +32,8 @@
   Applies the explicit `scout_runs` schema, including queue lifecycle columns, to the configured Postgres database.
 - `verify:providers`
   Confirms the live-provider seam classifies success, empty-result pages, provider degradation, parse failure, and manual-confirmation diagnostics deterministically.
+- `verify:outreach`
+  Confirms Scout can persist a local outreach draft against a completed run and retrieve it back through the outreach workspace seam.
 - `verify:persistence`
   Confirms Postgres connectivity, schema readiness, run write/read behavior, and recent-run retrieval.
 - `verify:queue`

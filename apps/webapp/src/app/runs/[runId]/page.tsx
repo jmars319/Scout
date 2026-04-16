@@ -6,6 +6,7 @@ import { AppFrame } from "@scout/ui";
 import { ReportView } from "@/components/ReportView";
 import { RunStatusView } from "@/components/RunStatusView";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { getOutreachWorkspaceState } from "@/lib/server/outreach/outreach-service";
 import { getScoutRun, getScoutRunRecord } from "@/lib/server/scout-runner";
 
 export const dynamic = "force-dynamic";
@@ -23,6 +24,7 @@ export default async function RunPage({
   }
 
   const report = await getScoutRun(runId);
+  const outreach = report ? await getOutreachWorkspaceState(runId) : null;
 
   return (
     <AppFrame
@@ -38,7 +40,7 @@ export default async function RunPage({
         </div>
       }
     >
-      {report ? <ReportView report={report} /> : <RunStatusView record={record} />}
+      {report && outreach ? <ReportView report={report} outreach={outreach} /> : <RunStatusView record={record} />}
     </AppFrame>
   );
 }

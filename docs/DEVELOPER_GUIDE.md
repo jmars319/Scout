@@ -13,6 +13,7 @@
 
 1. Run `pnpm run bootstrap`.
 2. Set `DATABASE_URL` in `.env` or your shell.
+   Optional for outreach drafting: set `OPENAI_API_KEY`.
 3. Run `pnpm run db:prepare`.
 4. If you have older local run files in `data/runs`, run `pnpm run db:import:local-runs`.
 5. Start the product with `pnpm run dev:web`.
@@ -96,10 +97,24 @@ If a desktop live-search run needs manual confirmation, Scout records that too.
 ## Storage
 
 - Runs: Postgres-backed persisted records in `scout_runs`
+- Outreach drafts: Postgres-backed local records in `scout_outreach_drafts`
 - Evidence: local screenshots in `data/evidence`
 - Legacy local runs: import/read compatibility source in `data/runs`
 
 Run storage and evidence storage both live behind explicit adapters. The worker and the web app both write through the same repository seam.
+
+## Outreach Drafting
+
+- Desktop is the primary operator surface for this workflow. The Next.js app renders the same outreach workspace inside Electron.
+- Outreach drafts are grounded on stored Scout report data:
+  shortlist reasons
+  confirmed or high-signal findings
+  business breakdown context
+- Drafts are local-first and saved into Postgres so reopening a run in desktop brings them back.
+- `OPENAI_API_KEY` enables draft generation through OpenAI.
+- `SCOUT_OUTREACH_MODEL` defaults to `gpt-5-mini`.
+- Manual editing and local save work even when the AI key is absent.
+- Scout still does not send outreach automatically. The operator reviews, edits, copies, and sends outside Scout.
 
 ## Worker Model
 
@@ -117,6 +132,8 @@ Run storage and evidence storage both live behind explicit adapters. The worker 
   Runs a small deterministic check over canonicalization, query variants, deduplication, and live-only acquisition behavior.
 - `pnpm run verify:providers`
   Verifies the hardened provider seam directly: DuckDuckGo HTML, Google Search, and Bing parsing success, empty-result detection, block/degradation detection, parse-failure detection, and fallback-trigger diagnostics under degraded live acquisition.
+- `pnpm run verify:outreach`
+  Seeds a completed verification run, saves a local outreach draft through the desktop-first outreach service layer, reads it back from Postgres, and then cleans up the verification records.
 - `pnpm run verify:persistence`
   Applies the schema, creates a queued run record, saves a completed run record, reads it back, checks recent-run retrieval, and deletes the verification row.
 - `pnpm run verify:queue`

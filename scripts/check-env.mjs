@@ -33,6 +33,9 @@ const searchProvider = env.SCOUT_SEARCH_PROVIDER || "duckduckgo_html";
 const interactiveSearchEnabled = ["1", "true", "yes"].includes(
   (env.SCOUT_INTERACTIVE_SEARCH || "0").toLowerCase()
 );
+const outreachModel = env.SCOUT_OUTREACH_MODEL;
+const outreachDefaultTone = env.SCOUT_OUTREACH_DEFAULT_TONE || "calm";
+const outreachDefaultLength = env.SCOUT_OUTREACH_DEFAULT_LENGTH || "standard";
 
 if (minCandidates < 1) {
   throw new Error("SCOUT_MIN_CANDIDATES must be at least 1.");
@@ -60,9 +63,9 @@ if (interactiveSearchEnabled && !env.SCOUT_INTERACTIVE_SEARCH_PROFILE_DIR) {
   );
 }
 
-if (!["duckduckgo_html", "google_html", "seeded_stub"].includes(searchProvider)) {
+if (!["duckduckgo_html", "google_html", "bing_html", "seeded_stub"].includes(searchProvider)) {
   throw new Error(
-    "SCOUT_SEARCH_PROVIDER must be `duckduckgo_html`, `google_html`, or `seeded_stub`."
+    "SCOUT_SEARCH_PROVIDER must be `duckduckgo_html`, `google_html`, `bing_html`, or `seeded_stub`."
   );
 }
 
@@ -70,6 +73,18 @@ if (searchProvider === "seeded_stub") {
   console.warn(
     "SCOUT_SEARCH_PROVIDER=seeded_stub is intended for verification only. Normal Scout runs now stay live-only."
   );
+}
+
+if (outreachModel && outreachModel.trim().length === 0) {
+  throw new Error("SCOUT_OUTREACH_MODEL must not be empty when provided.");
+}
+
+if (!["calm", "direct", "friendly"].includes(outreachDefaultTone)) {
+  throw new Error("SCOUT_OUTREACH_DEFAULT_TONE must be `calm`, `direct`, or `friendly`.");
+}
+
+if (!["brief", "standard"].includes(outreachDefaultLength)) {
+  throw new Error("SCOUT_OUTREACH_DEFAULT_LENGTH must be `brief` or `standard`.");
 }
 
 const evidenceDriver = env.EVIDENCE_STORAGE_DRIVER || "local";

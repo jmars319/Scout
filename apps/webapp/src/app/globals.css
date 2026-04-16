@@ -421,6 +421,87 @@ summary {
   padding: 1rem;
 }
 
+.outreach-stack {
+  display: grid;
+  gap: 1rem;
+}
+
+.outreach-banner {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  line-height: 1.55;
+}
+
+.outreach-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.pill-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.48rem 0.85rem;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.pill-button.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--line));
+}
+
+.draft-input,
+.draft-textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 0.95rem 1rem;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.draft-textarea {
+  min-height: 11rem;
+  resize: vertical;
+  line-height: 1.6;
+}
+
+.status-note {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 0.7rem 0.85rem;
+  line-height: 1.5;
+}
+
+.status-note.good {
+  background: var(--tone-good-bg);
+  color: var(--tone-good-ink);
+}
+
+.status-note.danger {
+  background: var(--tone-danger-bg);
+  color: var(--tone-danger-ink);
+}
+
+.status-note.neutral {
+  background: var(--tone-neutral-bg);
+  color: var(--tone-neutral-ink);
+}
+
 .theme-toggle-shell {
   display: inline-flex;
   flex: 0 0 auto;
@@ -492,7 +573,10 @@ html[data-theme="light"] .theme-toggle-thumb {
 .link-button:focus-visible,
 .secondary-button:focus-visible,
 .example-list button:focus-visible,
+.pill-button:focus-visible,
 .run-form input:focus-visible,
+.draft-input:focus-visible,
+.draft-textarea:focus-visible,
 .inline-link:focus-visible,
 summary:focus-visible {
   outline: 2px solid var(--accent);
@@ -524,6 +608,10 @@ summary:focus-visible {
 
   .theme-toggle {
     justify-content: space-between;
+  }
+
+  .outreach-banner {
+    flex-direction: column;
   }
 
   .finding-table,

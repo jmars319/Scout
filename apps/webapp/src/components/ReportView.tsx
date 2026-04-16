@@ -1,7 +1,15 @@
 import Link from "next/link";
 
-import type { AuditFinding, ScoutRunReport } from "@scout/domain";
+import type {
+  AuditFinding,
+  OutreachDraft,
+  OutreachLength,
+  OutreachTone,
+  ScoutRunReport
+} from "@scout/domain";
 import { Metric, MetricGrid, Panel, Tag } from "@scout/ui";
+
+import { OutreachWorkspace } from "./OutreachWorkspace";
 
 function humanize(value: string): string {
   return value
@@ -214,7 +222,19 @@ function sortFindings(findings: AuditFinding[]): AuditFinding[] {
   );
 }
 
-export function ReportView({ report }: { report: ScoutRunReport }) {
+export function ReportView({
+  report,
+  outreach
+}: {
+  report: ScoutRunReport;
+  outreach: {
+    aiAvailable: boolean;
+    defaultTone: OutreachTone;
+    defaultLength: OutreachLength;
+    model?: string | undefined;
+    drafts: OutreachDraft[];
+  };
+}) {
   const findingsByCandidate = groupFindings(report.findings);
   const ownedWebsiteCount = report.presences.filter(
     (presence) => presence.presenceType === "owned_website"
@@ -515,6 +535,21 @@ export function ReportView({ report }: { report: ScoutRunReport }) {
             Scout did not identify any shortlist candidates from this run.
           </p>
         )}
+      </Panel>
+
+      <Panel
+        title="Outreach Workspace"
+        description="Desktop-first drafting grounded on the stored Scout run. Generate, edit, save, and copy outreach without turning Scout into an email automation system."
+      >
+        <OutreachWorkspace
+          aiAvailable={outreach.aiAvailable}
+          defaultLength={outreach.defaultLength}
+          defaultTone={outreach.defaultTone}
+          initialDrafts={outreach.drafts}
+          leads={report.shortlist}
+          runId={report.runId}
+          {...(outreach.model ? { model: outreach.model } : {})}
+        />
       </Panel>
 
       <Panel

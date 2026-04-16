@@ -61,3 +61,23 @@ where true;
 
 create index if not exists scout_runs_created_at_idx on scout_runs (created_at desc);
 create index if not exists scout_runs_status_created_at_idx on scout_runs (status, created_at desc);
+
+create table if not exists scout_outreach_drafts (
+  draft_id text primary key,
+  run_id text not null references scout_runs (run_id) on delete cascade,
+  candidate_id text not null,
+  created_at timestamptz not null,
+  updated_at timestamptz not null,
+  business_name text not null,
+  primary_url text not null,
+  tone text not null check (tone in ('calm', 'direct', 'friendly')),
+  draft_length text not null check (draft_length in ('brief', 'standard')),
+  subject_line text not null,
+  body text not null,
+  grounding jsonb not null default '[]'::jsonb,
+  model text,
+  unique (run_id, candidate_id)
+);
+
+create index if not exists scout_outreach_drafts_run_updated_idx
+  on scout_outreach_drafts (run_id, updated_at desc);

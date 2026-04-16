@@ -6,6 +6,8 @@ import {
   confidenceLevels,
   findingSeverities,
   marketSampleQualities,
+  outreachLengths,
+  outreachTones,
   opportunityTypes,
   presenceQualities,
   presenceTypes,
@@ -202,6 +204,22 @@ export const scoutRunReportSchema = z.object({
   summary: scoutRunSummarySchema,
   notes: z.array(z.string()),
   errorMessage: z.string().optional()
+});
+
+export const outreachDraftSchema = z.object({
+  draftId: z.string(),
+  runId: z.string(),
+  candidateId: z.string(),
+  businessName: z.string(),
+  primaryUrl: z.url(),
+  tone: z.enum(outreachTones),
+  length: z.enum(outreachLengths),
+  subjectLine: z.string(),
+  body: z.string(),
+  grounding: z.array(z.string()),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
+  model: z.string().optional()
 });
 
 export const persistenceMetadataSchema = z.object({

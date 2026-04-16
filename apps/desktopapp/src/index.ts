@@ -4,5 +4,5 @@ export const desktopSurface = {
   appName: APP_NAME,
   active: true,
   runtime: "electron_shell",
-  note: "Desktop now wraps the working Scout web surface in a native Electron shell and starts the local worker automatically."
+  note: "Desktop is the primary Scout product surface. It wraps the shared local UI/runtime in Electron, starts the local worker automatically, and owns the operator workflow."
 };

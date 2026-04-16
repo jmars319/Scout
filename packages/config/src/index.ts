@@ -1,4 +1,4 @@
-import type { ViewportKind } from "@scout/domain";
+import type { OutreachLength, OutreachTone, ViewportKind } from "@scout/domain";
 
 export const APP_NAME = "Scout by JAMARQ";
 
@@ -29,7 +29,7 @@ export interface ScoutLimits {
   maxCandidates: number;
 }
 
-export type SearchProviderName = "duckduckgo_html" | "google_html" | "seeded_stub";
+export type SearchProviderName = "duckduckgo_html" | "google_html" | "bing_html" | "seeded_stub";
 
 export interface EvidenceStorageConfig {
   driver: "local" | "s3";
@@ -49,6 +49,15 @@ export interface InteractiveSearchConfig {
   enabled: boolean;
   timeoutMs: number;
   profileDir?: string;
+}
+
+export interface OutreachConfig {
+  enabled: boolean;
+  provider: "openai";
+  model: string;
+  apiKey?: string;
+  defaultTone: OutreachTone;
+  defaultLength: OutreachLength;
 }
 
 export function getAppName(source: Record<string, string | undefined> = process.env): string {
@@ -73,10 +82,11 @@ export function getSearchProviderName(
   if (
     providerName !== "duckduckgo_html" &&
     providerName !== "google_html" &&
+    providerName !== "bing_html" &&
     providerName !== "seeded_stub"
   ) {
     throw new Error(
-      `SCOUT_SEARCH_PROVIDER must be "duckduckgo_html", "google_html", or "seeded_stub", received "${providerName}".`
+      `SCOUT_SEARCH_PROVIDER must be "duckduckgo_html", "google_html", "bing_html", or "seeded_stub", received "${providerName}".`
     );
   }
 
@@ -132,5 +142,26 @@ export function getInteractiveSearchConfig(
     enabled: enabledValue === "1" || enabledValue === "true" || enabledValue === "yes",
     timeoutMs: Number.isFinite(timeoutMs) && timeoutMs >= 30_000 ? timeoutMs : 180_000,
     ...(profileDir ? { profileDir } : {})
+  };
+}
+
+export function getOutreachConfig(
+  source: Record<string, string | undefined> = process.env
+): OutreachConfig {
+  const apiKey = source.OPENAI_API_KEY?.trim();
+  const model = source.SCOUT_OUTREACH_MODEL?.trim() || "gpt-5-mini";
+  const defaultTone = (source.SCOUT_OUTREACH_DEFAULT_TONE?.trim() || "calm") as OutreachTone;
+  const defaultLength = (source.SCOUT_OUTREACH_DEFAULT_LENGTH?.trim() || "standard") as OutreachLength;
+
+  return {
+    enabled: Boolean(apiKey),
+    provider: "openai",
+    model,
+    ...(apiKey ? { apiKey } : {}),
+    defaultTone:
+      defaultTone === "calm" || defaultTone === "direct" || defaultTone === "friendly"
+        ? defaultTone
+        : "calm",
+    defaultLength: defaultLength === "brief" || defaultLength === "standard" ? defaultLength : "standard"
   };
 }

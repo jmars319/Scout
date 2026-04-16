@@ -27,7 +27,7 @@ export default async function HomePage() {
     <AppFrame
       eyebrow="Scout v1"
       title={APP_NAME}
-      description="Live-search market scanning for who exists, what kind of web presence they have, what is broken or missing, and which businesses are worth acting on."
+      description="Desktop-first live-search market scanning for who exists, what kind of web presence they have, what is broken or missing, and which businesses are worth acting on."
       actions={<ThemeToggle />}
     >
       <div className="scout-shell">
@@ -68,6 +68,7 @@ export default async function HomePage() {
             <p className="muted" style={{ margin: 0, lineHeight: 1.6 }}>
               The MVP stays thin: one query, one run, one report. No dashboard sprawl, no outreach
               automation, no deep crawl, and no AI pretending to replace deterministic evidence.
+              AI only helps draft grounded follow-up after Scout has already produced a local report.
             </p>
           </Panel>
         </div>
