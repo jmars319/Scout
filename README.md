@@ -1,15 +1,15 @@
 # Scout
 
-Scout by JAMARQ is a search-seeded market scanner that identifies, audits, and classifies business web presence to surface actionable opportunities.
+Scout by JAMARQ is a live-search market scanner that identifies, audits, and classifies business web presence to surface actionable opportunities.
 
 Scout is not a crawler, an SEO suite, or an AI-first app. The v1 product shape is intentionally narrow: input, run, report.
 
 ## Current MVP State
 
 - `apps/webapp` is the active product surface.
-- `apps/desktopapp` is scaffold-only for a future operator shell.
+- `apps/desktopapp` is now an active Electron shell that wraps the local web app and worker in a native desktop window.
 - `apps/mobileapp` is scaffold-only for future expansion.
-- Search uses a narrow provider seam with a hardened DuckDuckGo HTML adapter and an honest seeded fallback path.
+- Search uses a narrow provider seam with hardened DuckDuckGo HTML, Google Search, and Bing HTML adapters. Live runs no longer backfill seeded candidates.
 - Presence typing uses deterministic URL, domain, redirect, and basic destination-state rules before audit.
 - Acquisition now canonicalizes URLs, deduplicates across light query variants, and records sample-quality diagnostics.
 - Runs are stored in Postgres through an explicit repository layer.
@@ -52,16 +52,20 @@ scout/
 - `pnpm run db:import:local-runs`
 - `pnpm run check:env`
 - `pnpm run check:packages`
+- `pnpm run clean:local`
+- `pnpm run clean:local:full`
 - `pnpm run dev:web`
 - `pnpm run dev:worker`
 - `pnpm run dev:all`
 - `pnpm run dev:desktop`
+- `pnpm run start:desktop`
 - `pnpm run dev:mobile`
 - `pnpm run dev:both`
 - `pnpm run worker:start`
 - `pnpm run build:web`
 - `pnpm run build:desktop`
 - `pnpm run build:mobile`
+- `pnpm run package:desktop`
 - `pnpm run lint`
 - `pnpm run typecheck`
 - `pnpm run verify:acquisition`
@@ -88,11 +92,33 @@ scout/
 9. Stores structured run data in Postgres and screenshot evidence locally.
 10. Renders the market summary, acquisition diagnostics, business breakdowns, common issues, and shortlist.
 
+## Desktop App
+
+- `pnpm run dev:desktop`
+  Starts a local Next.js dev server, starts the queued worker, and opens Scout in an Electron window on an isolated local port.
+- `pnpm run start:desktop`
+  Opens the same Electron shell against a production Next.js server started locally with `next start`.
+- `pnpm run verify:desktop`
+  Confirms the desktop package typechecks and that Electron can launch Scout's desktop runtime entrypoint.
+- `pnpm run package:desktop`
+  Builds a macOS desktop release under `dist/desktop`, including an unpacked `.app`, a `.zip`, and a `.dmg`.
+- Desktop startup automatically prunes cache-heavy folders inside the interactive-search Chromium profile at most once per 24 hours. That keeps `.local` from growing indefinitely without throwing away the session state that helps DuckDuckGo and Google confirmation windows stay useful.
+- `pnpm run clean:local`
+  Prunes only the interactive-search browser caches under repo `.local`.
+- `pnpm run clean:local:full`
+  Removes the interactive-search profile, the desktop cleanup marker, and local screenshot evidence. Postgres run history is not deleted.
+- The desktop app does not fork the product into a second surface. It wraps the same repository-backed web flow:
+  input, queued run, worker execution, report.
+- The packaged macOS app runs its own bundled `next start` server, bundled worker runtime, and bundled Chromium for audits.
+- Desktop mode also enables manual in-browser confirmation for blocked live-search challenges. If DuckDuckGo or Google serves a human-check page, Scout opens a local browser-backed search window and continues the run after the operator clears it.
+- The packaged app still needs `DATABASE_URL`. When launched outside a shell, it reads env from `~/Library/Application Support/Scout by JAMARQ/.env` or from `Scout.app/Contents/Resources/scout.env` if you place one there before launch.
+
 ## Live Acquisition
 
-- Default live path: DuckDuckGo HTML.
-- Seeded fallback path: deterministic catalog used only when live acquisition is disabled or too weak to hit Scout’s minimum sample threshold.
-- Acquisition diagnostics now record provider attempts, source contribution counts, fallback triggers, and caution notes so the operator can see whether a run was mostly live, partially fallback-assisted, or effectively non-live.
+- Default live path: DuckDuckGo HTML plus Google Search and Bing HTML as additional live providers on the same narrow seam.
+- Live runs now either keep real live candidates or fail honestly when acquisition returns nothing usable.
+- Acquisition diagnostics record provider attempts, source contribution counts, degradation reasons, and caution notes so the operator can see what happened upstream before a run completed or failed.
+- In desktop mode, blocked live providers can open a real browser-backed challenge window so the operator can confirm the search was human and let Scout continue without synthetic fallback.
 - Scout still keeps the provider layer intentionally narrow. There is no large multi-vendor search framework here.
 
 ## HTTP Smoke Verification
@@ -108,10 +134,10 @@ scout/
 - No deep crawl.
 - No authentication flow.
 - No Redis, BullMQ, or separate cloud worker system.
-- No second live search provider yet.
+- The desktop app is a thin local shell over the existing web app and worker, not a separate native feature set.
 - Screenshot evidence is still local-only.
 - The background worker currently uses a simple Postgres-backed queue loop.
-- Live acquisition can still degrade when DuckDuckGo HTML changes or blocks requests, but Scout now records that degradation more explicitly before falling back.
+- Live acquisition can still degrade when DuckDuckGo HTML, Google Search, or Bing HTML change or block requests, but Scout now records that degradation and fails without substituting seeded market results.
 - No outreach or campaign system.
 - No AI-generated discovery.
 

@@ -15,10 +15,17 @@ export interface EvidenceStorage {
   saveScreenshot: (relativePath: string, buffer: Buffer) => Promise<StoredEvidence>;
 }
 
-const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../../../..");
+function getRuntimeRoot(): string {
+  const configuredRoot = process.env.SCOUT_RUNTIME_ROOT?.trim();
+  if (configuredRoot) {
+    return path.resolve(configuredRoot);
+  }
+
+  return path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../../../..");
+}
 
 function resolveEvidenceDirPath(configuredPath: string): string {
-  return path.isAbsolute(configuredPath) ? configuredPath : path.resolve(repoRoot, configuredPath);
+  return path.isAbsolute(configuredPath) ? configuredPath : path.resolve(getRuntimeRoot(), configuredPath);
 }
 
 export function getEvidenceBaseDir(): string {

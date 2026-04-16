@@ -3,8 +3,9 @@ import { chromium } from "playwright";
 import { runScout, type ScoutRunReport } from "@scout/domain";
 
 import { createPlaywrightAuditor } from "../audit/playwright-auditor.ts";
+import { buildFailedReport } from "../report/failed-report.ts";
 import { detectPresence } from "../search/presence-detector.ts";
-import { createSearchProvider } from "../search/provider.ts";
+import { ScoutAcquisitionFailure, createSearchProvider } from "../search/provider.ts";
 import { createEvidenceStorage } from "../storage/evidence-storage.ts";
 import {
   normalizePersistedIntent,
@@ -26,14 +27,33 @@ export async function executeScoutRunRecord(
       runId: record.runId
     });
 
-    return await runScout(record.input, {
-      resolveIntent: () => normalizePersistedIntent(record.intent),
-      searchCandidates: (intent) => searchProvider.search(intent),
-      detectPresence,
-      auditPresence: (presence, intent) => auditor.auditPresence(presence, intent),
-      now: () => createdAt,
-      generateRunId: () => record.runId
-    });
+    try {
+      return await runScout(record.input, {
+        resolveIntent: () => normalizePersistedIntent(record.intent),
+        searchCandidates: (intent) => searchProvider.search(intent),
+        detectPresence,
+        auditPresence: (presence, intent) => auditor.auditPresence(presence, intent),
+        now: () => createdAt,
+        generateRunId: () => record.runId
+      });
+    } catch (error) {
+      if (error instanceof ScoutAcquisitionFailure) {
+        return buildFailedReport({
+          runId: record.runId,
+          query: record.input,
+          intent: normalizePersistedIntent(record.intent),
+          createdAt,
+          acquisition: error.diagnostics,
+          searchSource: error.searchSource,
+          notes: error.diagnostics.notes,
+          errorMessage: error.message
+        });
+      }
+
+      throw error;
+    } finally {
+      await searchProvider.dispose?.();
+    }
   } finally {
     await browser.close();
   }

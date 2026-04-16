@@ -21,6 +21,7 @@ export * from "./audit.ts";
 export * from "./findings.ts";
 export * from "./classification.ts";
 export * from "./report.ts";
+export * from "./business-types.ts";
 
 function defaultRunId(now: Date): string {
   return `run_${now.toISOString().replace(/[:.]/g, "-")}`;

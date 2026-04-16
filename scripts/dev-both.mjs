@@ -5,10 +5,10 @@ import path from "node:path";
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const pnpmBin = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
 
-console.log("Desktop and mobile are scaffold-only in Scout v1.");
-console.log("dev:both currently runs the active web product surface.");
+console.log("Desktop is now an active Scout shell.");
+console.log("dev:both delegates to dev:desktop while mobile remains scaffold-only.");
 
-const child = spawn(pnpmBin, ["run", "dev:web"], {
+const child = spawn(pnpmBin, ["run", "dev:desktop"], {
   cwd: rootDir,
   stdio: "inherit"
 });

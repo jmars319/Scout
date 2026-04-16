@@ -9,7 +9,14 @@ import {
   upgradeLegacyLocalRecord
 } from "./persisted-run-record.ts";
 
-const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../../../..");
+function getRuntimeRoot(): string {
+  const configuredRoot = process.env.SCOUT_RUNTIME_ROOT?.trim();
+  if (configuredRoot) {
+    return path.resolve(configuredRoot);
+  }
+
+  return path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../../../..");
+}
 
 export interface LegacyRunImportCandidate {
   filePath: string;
@@ -18,7 +25,7 @@ export interface LegacyRunImportCandidate {
 }
 
 export function getLegacyRunsDir(): string {
-  return path.resolve(repoRoot, "data/runs");
+  return path.resolve(getRuntimeRoot(), "data/runs");
 }
 
 async function readLegacyRunRecordFromFile(filePath: string): Promise<PersistedRunRecord | null> {

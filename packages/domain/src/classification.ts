@@ -47,6 +47,18 @@ function determineConfidence(
   return presence.presenceType === "unknown" ? "inferred" : "probable";
 }
 
+function isShortlistEligiblePresenceType(
+  presenceType: PresenceRecord["presenceType"]
+): boolean {
+  return (
+    presenceType === "owned_website" ||
+    presenceType === "facebook_only" ||
+    presenceType === "yelp_only" ||
+    presenceType === "dead" ||
+    presenceType === "blocked"
+  );
+}
+
 export function classifyBusiness(
   presence: PresenceRecord,
   findings: AuditFinding[]
@@ -226,6 +238,7 @@ export function buildLeadShortlist(
       : 0;
 
   return presences
+    .filter((presence) => isShortlistEligiblePresenceType(presence.presenceType))
     .map((presence) => {
       const classification = classificationByCandidate.get(presence.candidateId);
       if (!classification) {

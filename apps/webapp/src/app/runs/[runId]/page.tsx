@@ -5,6 +5,7 @@ import { AppFrame } from "@scout/ui";
 
 import { ReportView } from "@/components/ReportView";
 import { RunStatusView } from "@/components/RunStatusView";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { getScoutRun, getScoutRunRecord } from "@/lib/server/scout-runner";
 
 export const dynamic = "force-dynamic";
@@ -29,9 +30,12 @@ export default async function RunPage({
       title={record.intent.marketTerm}
       description={`Run ${record.runId} for "${record.input.rawQuery}"`}
       actions={
-        <Link className="link-button" href="/">
-          New run
-        </Link>
+        <div className="header-actions">
+          <Link className="link-button" href="/">
+            New run
+          </Link>
+          <ThemeToggle />
+        </div>
       }
     >
       {report ? <ReportView report={report} /> : <RunStatusView record={record} />}

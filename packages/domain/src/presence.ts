@@ -17,8 +17,21 @@ const DIRECTORY_DOMAINS = [
   "local.yahoo.com",
   "nicelocal.com",
   "showmelocal.com",
+  "threebestrated.com",
   "tripadvisor.com",
-  "vitals.com"
+  "vitals.com",
+  "buildzoom.com",
+  "restaurantji.com",
+  "menupix.com",
+  "bdir.in",
+  "nearbydonuts.com",
+  "donutlocations.com",
+  "restaurantguru.com",
+  "zmenu.com",
+  "allmenus.com",
+  "menuism.com",
+  "menuwithprice.com",
+  "findmeglutenfree.com"
 ] as const;
 const MARKETPLACE_DOMAINS = [
   "doordash.com",
@@ -40,9 +53,12 @@ const MARKETPLACE_DOMAINS = [
   "thumbtack.com",
   "angi.com",
   "homeadvisor.com",
+  "homeguide.com",
+  "lawnstarter.com",
   "zocdoc.com",
   "vrbo.com",
-  "airbnb.com"
+  "airbnb.com",
+  "joe.coffee"
 ] as const;
 const FACEBOOK_DOMAINS = ["facebook.com", "m.facebook.com"];
 const YELP_DOMAINS = ["yelp.com"];
@@ -54,7 +70,11 @@ const SOCIAL_PROFILE_DOMAINS = [
   "twitter.com",
   "youtube.com",
   "pinterest.com",
-  "nextdoor.com"
+  "nextdoor.com",
+  "reddit.com",
+  "redd.it",
+  "zhihu.com",
+  "quora.com"
 ] as const;
 const OWNED_SITE_HOST_ALLOWLIST = [
   "square.site",
@@ -92,6 +112,31 @@ const MARKETPLACE_TEXT_PATTERNS = [
   "book now",
   "schedule online"
 ] as const;
+const GUIDE_TEXT_PATTERNS = [
+  "where to eat the best",
+  "must-try",
+  "current favorites are",
+  "following are the list",
+  "latest reviews, photos and ratings",
+  "view the menu, hours, phone number, address and map",
+  "locally made",
+  "treat your taste buds"
+] as const;
+const GUIDE_TEXT_REGEX_PATTERNS = [
+  /\btop\s+\d+\b/,
+  /\bbest\b.+\bin\b/,
+  /\bnear me\b/,
+  /\bbest places?\b/,
+  /\bpopular\b.+\bas per\b/
+] as const;
+const GUIDE_PATH_PATTERNS = [
+  /\/blog(\/|$)/,
+  /\/best[-/]/,
+  /\/top[-/]/,
+  /\/near[-/]me/,
+  /\/locations?\//,
+  /\/category\//
+] as const;
 
 export interface PresenceRuleMatch {
   type: PresenceType;
@@ -107,8 +152,16 @@ function matchesAnyPattern(value: string, patterns: readonly RegExp[]): boolean 
   return patterns.some((pattern) => pattern.test(value));
 }
 
+function countMatchingPatterns(value: string, patterns: readonly RegExp[]): number {
+  return patterns.filter((pattern) => pattern.test(value)).length;
+}
+
 function includesAny(value: string, snippets: readonly string[]): boolean {
   return snippets.some((snippet) => value.includes(snippet));
+}
+
+function countIncludes(value: string, snippets: readonly string[]): number {
+  return snippets.filter((snippet) => value.includes(snippet)).length;
 }
 
 function buildRuleMatch(
@@ -132,6 +185,10 @@ export function evaluatePresenceUrl(input: {
   const domain = parsedUrl.hostname.toLowerCase().replace(/^www\./, "");
   const pathname = parsedUrl.pathname.toLowerCase();
   const combinedText = `${input.title ?? ""} ${input.snippet ?? ""}`.toLowerCase();
+  const guideTextMatchCount =
+    countIncludes(combinedText, GUIDE_TEXT_PATTERNS) +
+    countMatchingPatterns(combinedText, GUIDE_TEXT_REGEX_PATTERNS);
+  const guidePathMatch = matchesAnyPattern(pathname, GUIDE_PATH_PATTERNS);
 
   if (matchesKnownDomain(domain, FACEBOOK_DOMAINS as unknown as string[])) {
     if (pathname.includes("/pages/") || pathname.includes("/profile.php")) {
@@ -162,9 +219,15 @@ export function evaluatePresenceUrl(input: {
     matchesKnownDomain(domain, DIRECTORY_DOMAINS) ||
     (!matchesKnownDomain(domain, OWNED_SITE_HOST_ALLOWLIST) &&
       matchesAnyPattern(pathname, DIRECTORY_PATH_PATTERNS) &&
-      includesAny(combinedText, DIRECTORY_TEXT_PATTERNS))
+      includesAny(combinedText, DIRECTORY_TEXT_PATTERNS)) ||
+    (!matchesKnownDomain(domain, OWNED_SITE_HOST_ALLOWLIST) &&
+      (guideTextMatchCount >= 2 || (guidePathMatch && guideTextMatchCount >= 1)))
   ) {
-    return buildRuleMatch("directory_only", "Result appears to be a directory or listing page.", "probable");
+    return buildRuleMatch(
+      "directory_only",
+      "Result appears to be a directory, roundup, or listing page rather than a business-owned website.",
+      "probable"
+    );
   }
 
   if (matchesKnownDomain(domain, SOCIAL_PROFILE_DOMAINS)) {

@@ -4,6 +4,7 @@ import { APP_NAME } from "@scout/config";
 import { AppFrame, Metric, MetricGrid, Panel, Tag } from "@scout/ui";
 
 import { RunForm } from "@/components/RunForm";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { listRecentScoutRuns } from "@/lib/server/scout-runner";
 
 export const dynamic = "force-dynamic";
@@ -26,12 +27,13 @@ export default async function HomePage() {
     <AppFrame
       eyebrow="Scout v1"
       title={APP_NAME}
-      description="Search-seeded market scanning for who exists, what kind of web presence they have, what is broken or missing, and which businesses are worth acting on."
+      description="Live-search market scanning for who exists, what kind of web presence they have, what is broken or missing, and which businesses are worth acting on."
+      actions={<ThemeToggle />}
     >
       <div className="scout-shell">
         <Panel
           title="Run a market scan"
-          description="Scout accepts one query, resolves a narrow market intent, gathers 10 to 15 candidate presences, audits owned websites where possible, and returns a deterministic report."
+          description="Start with a structured business type plus city/state, or override it with one custom query. Scout still runs the same narrow flow: resolve market intent, gather 10 to 15 candidate presences, audit owned websites where possible, and return a deterministic report."
         >
           <RunForm />
         </Panel>
@@ -51,7 +53,7 @@ export default async function HomePage() {
               <Tag tone="good">Lead shortlist</Tag>
             </div>
             <p className="muted" style={{ margin: 0, lineHeight: 1.6 }}>
-              Scout is search-seeded and evidence-led. It classifies owned sites, directory-only
+              Scout is live-search and evidence-led. It classifies owned sites, directory-only
               presences, social-only presences, dead sites, blocked sites, and unclear results before
               deciding what should be audited.
             </p>

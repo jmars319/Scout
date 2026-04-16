@@ -1,4 +1,5 @@
 import {
+  type AcquisitionDiagnostics,
   buildRunSummary,
   createEmptyAcquisitionDiagnostics,
   resolveMarketIntent,
@@ -13,9 +14,16 @@ export function buildFailedReport(input: {
   errorMessage: string;
   intent?: ResolvedMarketIntent;
   createdAt?: Date;
+  acquisition?: AcquisitionDiagnostics;
+  searchSource?: string;
+  notes?: string[];
 }): ScoutRunReport {
   const createdAt = input.createdAt ?? new Date();
-  const acquisition = createEmptyAcquisitionDiagnostics("unresolved");
+  const acquisition = input.acquisition ?? createEmptyAcquisitionDiagnostics("unresolved");
+  const notes = [
+    ...(input.notes ?? []),
+    "Scout stopped before the report could be completed."
+  ];
 
   return {
     schemaVersion: 2,
@@ -25,7 +33,7 @@ export function buildFailedReport(input: {
     query: input.query,
     intent: input.intent ?? resolveMarketIntent(input.query),
     acquisition,
-    searchSource: "unresolved",
+    searchSource: input.searchSource ?? acquisition.provider,
     candidates: [],
     presences: [],
     findings: [],
@@ -33,7 +41,7 @@ export function buildFailedReport(input: {
     businessBreakdowns: [],
     shortlist: [],
     summary: buildRunSummary([], [], [], acquisition.sampleQuality, new Set()),
-    notes: ["Scout stopped before the report could be completed."],
+    notes: [...new Set(notes)],
     errorMessage: input.errorMessage
   };
 }

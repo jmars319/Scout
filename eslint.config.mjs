@@ -9,6 +9,7 @@ export default [
     ignores: [
       "**/.next/**",
       "**/dist/**",
+      "apps/desktopapp/.desktop-runtime/**",
       "**/coverage/**",
       "**/node_modules/**",
       "data/evidence/**",

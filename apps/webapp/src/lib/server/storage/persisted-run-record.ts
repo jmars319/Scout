@@ -110,6 +110,18 @@ function resolveSearchSource(record: PersistedRunRecord): string {
     return "unresolved";
   }
 
+  const selectedSources = [
+    ...new Set(
+      record.acquisition.candidateSources
+        .filter((source) => source.selectedCandidateCount > 0)
+        .map((source) => source.source)
+    )
+  ];
+
+  if (selectedSources.length > 0) {
+    return selectedSources.join(" + ");
+  }
+
   if (record.acquisition.provider === "seeded_stub") {
     return "seeded_stub";
   }

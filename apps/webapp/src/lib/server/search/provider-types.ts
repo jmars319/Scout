@@ -21,4 +21,5 @@ export interface SearchProviderAdapter {
   name: string;
   kind: AcquisitionSourceKind;
   executeQuery: (query: string, limit: number) => Promise<ProviderSearchResponse>;
+  dispose?: () => Promise<void>;
 }

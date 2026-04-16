@@ -20,6 +20,10 @@
 7. Open `http://localhost:3000`.
 
 `pnpm run dev:all` starts the web app and worker together in one local shell session.
+`pnpm run dev:desktop` starts a local web server plus worker automatically, then opens the same Scout flow inside Electron.
+`pnpm run package:desktop` builds a macOS desktop release under `dist/desktop`.
+`pnpm run clean:local` prunes the desktop interactive-search browser caches without clearing the saved session.
+`pnpm run clean:local:full` removes the local interactive-search profile and local screenshot evidence without touching Postgres.
 
 `bootstrap` installs workspace dependencies, ensures local data directories exist, and installs the Chromium browser used by Playwright.
 
@@ -39,8 +43,8 @@
 
 ## Search Behavior
 
-- Default provider: DuckDuckGo HTML scrape.
-- Fallback provider: seeded deterministic catalog.
+- Default provider path: DuckDuckGo HTML scrape, Google Search, and Bing HTML on the same live seam.
+- Verification-only provider: seeded deterministic catalog.
 - Provider seam: explicit adapters return candidates plus structured attempt diagnostics.
 - Query acquisition uses a very small deterministic variant set:
   raw query
@@ -48,20 +52,23 @@
   singularized variant only when it is safely derivable
 - URLs are canonicalized before final candidate selection.
 - Candidates are deduplicated before presence typing and audit.
-- Domain logic never hardcodes a Google-specific assumption.
-- DuckDuckGo degradation is classified explicitly when Scout sees:
+- Domain logic never hardcodes provider-specific assumptions.
+- Live-provider degradation is classified explicitly when Scout sees:
   empty-result pages
   anti-bot/block-like pages
   parse failures
   transient network or HTTP failures
-- Seeded fallback activates only when live acquisition is disabled or when live candidates land below Scout's minimum target count.
+- Google Search can return either a browser-only JavaScript shell or a reCAPTCHA challenge. Scout treats both as degraded and can escalate into the same browser-backed confirmation path in desktop mode.
+- Desktop mode can escalate blocked DuckDuckGo or Google searches into a real browser-backed session so the operator can complete a human challenge and let the run continue.
+- Seeded fallback is now verification-only. Normal product runs do not backfill live-search failures with seeded candidates.
 - Acquisition diagnostics now record:
   provider attempts
   candidate source contribution counts
-  fallback trigger reasons
+  verification-only fallback trigger reasons
   caution notes tied to live-provider weakness
 
 If live acquisition is weak, partial, or fallback-heavy, Scout records that in acquisition diagnostics and sample-quality notes.
+If a desktop live-search run needs manual confirmation, Scout records that too.
 
 ## Audit Behavior
 
@@ -107,9 +114,9 @@ Run storage and evidence storage both live behind explicit adapters. The worker 
 ## Verification
 
 - `pnpm run verify:acquisition`
-  Runs a small deterministic check over canonicalization, query variants, deduplication, and fallback diagnostics.
+  Runs a small deterministic check over canonicalization, query variants, deduplication, and live-only acquisition behavior.
 - `pnpm run verify:providers`
-  Verifies the hardened provider seam directly: DuckDuckGo HTML parsing success, empty-result detection, block/degradation detection, parse-failure detection, and fallback-trigger diagnostics under degraded live acquisition.
+  Verifies the hardened provider seam directly: DuckDuckGo HTML, Google Search, and Bing parsing success, empty-result detection, block/degradation detection, parse-failure detection, and fallback-trigger diagnostics under degraded live acquisition.
 - `pnpm run verify:persistence`
   Applies the schema, creates a queued run record, saves a completed run record, reads it back, checks recent-run retrieval, and deletes the verification row.
 - `pnpm run verify:queue`
@@ -119,15 +126,42 @@ Run storage and evidence storage both live behind explicit adapters. The worker 
 - `pnpm run verify:web`
   Runs lint, typecheck, acquisition verification, persistence verification, queue verification, and the web build.
 
-`verify:http-smoke` requires `DATABASE_URL`, local Postgres access, and the Playwright browser installed by `pnpm run bootstrap`. It intentionally forces `SCOUT_SEARCH_PROVIDER=seeded_stub` and smaller candidate limits inside the temporary child processes so the smoke path proves HTTP lifecycle integrity without depending on live DuckDuckGo stability.
+`verify:http-smoke` requires `DATABASE_URL`, local Postgres access, and the Playwright browser installed by `pnpm run bootstrap`. It intentionally forces `SCOUT_SEARCH_PROVIDER=seeded_stub` and smaller candidate limits inside the temporary child processes so the smoke path proves HTTP lifecycle integrity without depending on live-provider stability. That stub path is verification-only; normal Scout runs no longer backfill seeded candidates.
 
-`SCOUT_SEARCH_PROVIDER` is intentionally narrow. Valid values are `duckduckgo_html` and `seeded_stub`.
+`SCOUT_SEARCH_PROVIDER` is intentionally narrow. Valid values are `duckduckgo_html`, `google_html`, and `seeded_stub`. `seeded_stub` is reserved for verification; normal product runs should stay live-only.
 
-## Inactive App Surfaces
+Desktop shells automatically set:
+- `SCOUT_INTERACTIVE_SEARCH=1`
+- `SCOUT_INTERACTIVE_SEARCH_PROFILE_DIR=<local desktop profile path>`
+
+That allows blocked DuckDuckGo HTML and Google Search runs to open a local browser-backed confirmation window without widening the web product surface.
+Desktop startup also prunes cache-heavy folders inside that profile at most once per 24 hours so `.local` does not grow indefinitely while cookies and session storage stay intact.
+
+## Desktop And Mobile Surfaces
 
 - `pnpm run dev:desktop`
-  Prints a stable scaffold message and exits.
+  Starts the local web app and worker on an isolated loopback port, then opens Scout in an Electron shell.
+- `pnpm run start:desktop`
+  Runs the same desktop shell against a local production Next.js server.
+- `pnpm run verify:desktop`
+  Typechecks the desktop package and verifies the Electron runtime entrypoint can boot and exit cleanly.
+- `pnpm run package:desktop`
+  Builds a packaged macOS release that bundles:
+  the production Next.js build
+  a deployed webapp runtime with its own `node_modules`
+  a bundled worker entrypoint
+  the Playwright Chromium binaries used by Scout audits
 - `pnpm run dev:mobile`
-  Prints a stable scaffold message and exits.
+  Mobile remains scaffold-only in v1 and currently prints a stable message.
 
-These apps are intentionally not activated in v1.
+Desktop stays intentionally thin. It does not introduce a second product workflow or a separate persistence model; it wraps the same `input -> run -> report` path already implemented in the web app and worker.
+
+## Packaged Desktop Env
+
+- The packaged app still requires `DATABASE_URL`.
+- If you launch it from Finder, place a `.env` file at:
+  `~/Library/Application Support/Scout by JAMARQ/.env`
+- The packaged app also checks:
+  `Scout.app/Contents/Resources/scout.env`
+- `EVIDENCE_LOCAL_DIR` is set automatically for the packaged app to a user-data evidence folder, so screenshot storage stays outside the app bundle.
+- The packaged app also auto-prunes cache-heavy interactive-search folders on startup, but preserves the core browser profile so manual provider confirmation can continue working across runs.

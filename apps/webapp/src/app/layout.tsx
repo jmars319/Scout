@@ -4,6 +4,20 @@ import { getAppName } from "@scout/config";
 
 import "./globals.css";
 
+const themeBootstrapScript = `
+  (() => {
+    const storageKey = "scout-theme";
+    const fallbackTheme = "dark";
+    try {
+      const savedTheme = window.localStorage.getItem(storageKey);
+      const theme = savedTheme === "light" ? "light" : fallbackTheme;
+      document.documentElement.dataset.theme = theme;
+    } catch {
+      document.documentElement.dataset.theme = fallbackTheme;
+    }
+  })();
+`;
+
 export const metadata: Metadata = {
   title: getAppName(),
   description:
@@ -16,8 +30,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body>{children}</body>
+    <html data-theme="dark" lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeBootstrapScript }} />
+      </head>
+      <body>
+        {children}
+      </body>
     </html>
   );
 }

@@ -74,7 +74,7 @@ export function RunStatusView({ record }: { record: PersistedRunRecord }) {
           </div>
         ) : null}
 
-        <button onClick={() => router.refresh()} type="button">
+        <button className="secondary-button" onClick={() => router.refresh()} type="button">
           Refresh status
         </button>
       </Panel>

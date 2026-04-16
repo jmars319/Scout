@@ -1,12 +1,10 @@
 import * as cheerio from "cheerio";
-
-import { getPublicAppUrl } from "@scout/config";
-
 import type {
   ProviderSearchCandidate,
   ProviderSearchResponse,
   SearchProviderAdapter
 } from "./provider-types.ts";
+import type { InteractiveBrowserSearchSession } from "./interactive-browser.ts";
 
 const REQUEST_TIMEOUT_MS = 12_000;
 const RESULT_SELECTORS = [
@@ -20,7 +18,12 @@ const BLOCK_MARKERS = [
   "unusual traffic",
   "captcha",
   "verify you are human",
-  "please enable javascript"
+  "please enable javascript",
+  "bots use duckduckgo too",
+  "confirm this search was made by a human",
+  "images not loading?",
+  "error-lite@duckduckgo.com",
+  "anomaly-modal"
 ];
 const EMPTY_MARKERS = [
   "no results.",
@@ -33,6 +36,21 @@ function normalizeWhitespace(value: string): string {
   return value.replace(/\s+/g, " ").trim();
 }
 
+function isDuckDuckGoInternalUrl(value: string): boolean {
+  try {
+    const parsed = new URL(value);
+    const hostname = parsed.hostname.toLowerCase().replace(/^www\./, "");
+
+    return hostname === "duckduckgo.com" || hostname === "html.duckduckgo.com";
+  } catch {
+    return false;
+  }
+}
+
+function finalizeResultUrl(value: string): string | null {
+  return isDuckDuckGoInternalUrl(value) ? null : value;
+}
+
 function normalizeResultUrl(href: string | undefined): string | null {
   if (!href) {
     return null;
@@ -41,15 +59,19 @@ function normalizeResultUrl(href: string | undefined): string | null {
   if (href.includes("uddg=")) {
     const url = new URL(href, "https://duckduckgo.com");
     const target = url.searchParams.get("uddg");
-    return target ? decodeURIComponent(target) : null;
+    if (!target) {
+      return null;
+    }
+
+    return finalizeResultUrl(decodeURIComponent(target));
   }
 
   if (href.startsWith("//")) {
-    return `https:${href}`;
+    return finalizeResultUrl(`https:${href}`);
   }
 
   if (href.startsWith("http://") || href.startsWith("https://")) {
-    return href;
+    return finalizeResultUrl(href);
   }
 
   return null;
@@ -229,31 +251,57 @@ function classifyHttpStatus(status: number): ProviderSearchResponse {
   };
 }
 
-export function createDuckDuckGoHtmlProvider(): SearchProviderAdapter {
-  const appUrl = getPublicAppUrl();
+function buildSearchUrl(query: string): string {
+  return `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
+}
+
+async function runFetchQuery(query: string): Promise<Response> {
+  const browserUserAgent =
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+
+  return fetch("https://html.duckduckgo.com/html/", {
+    method: "POST",
+    headers: {
+      accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "accept-language": "en-US,en;q=0.9",
+      "cache-control": "no-cache",
+      "content-type": "application/x-www-form-urlencoded",
+      pragma: "no-cache",
+      origin: "https://html.duckduckgo.com",
+      referer: buildSearchUrl(query),
+      "user-agent": browserUserAgent
+    },
+    body: new URLSearchParams({
+      q: query
+    }),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+  });
+}
+
+export function createDuckDuckGoHtmlProvider(options?: {
+  interactiveSession?: InteractiveBrowserSearchSession | null;
+}): SearchProviderAdapter {
+  const interactiveSession = options?.interactiveSession ?? null;
+  let browserBackedMode = false;
 
   return {
     name: "duckduckgo_html",
     kind: "live",
     async executeQuery(query, limit) {
+      if (browserBackedMode && interactiveSession) {
+        return interactiveSession.search({
+          providerName: "DuckDuckGo HTML",
+          query,
+          limit,
+          searchUrl: buildSearchUrl(query),
+          parsePage: parseDuckDuckGoHtmlSearchPage
+        });
+      }
+
       let response: Response;
 
       try {
-        response = await fetch("https://html.duckduckgo.com/html/", {
-          method: "POST",
-          headers: {
-            accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "accept-language": "en-US,en;q=0.9",
-            "cache-control": "no-cache",
-            "content-type": "application/x-www-form-urlencoded",
-            pragma: "no-cache",
-            "user-agent": `Scout/0.1 (+${appUrl})`
-          },
-          body: new URLSearchParams({
-            q: query
-          }),
-          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
-        });
+        response = await runFetchQuery(query);
       } catch (error) {
         return {
           outcome: "network_error",
@@ -267,7 +315,25 @@ export function createDuckDuckGoHtmlProvider(): SearchProviderAdapter {
       }
 
       const html = await response.text();
-      return parseDuckDuckGoHtmlSearchPage(html, limit);
-    }
+      const parsed = parseDuckDuckGoHtmlSearchPage(html, limit);
+
+      if (parsed.outcome !== "blocked" || !interactiveSession) {
+        return parsed;
+      }
+
+      const browserResponse = await interactiveSession.search({
+        providerName: "DuckDuckGo HTML",
+        query,
+        limit,
+        searchUrl: buildSearchUrl(query),
+        parsePage: parseDuckDuckGoHtmlSearchPage
+      });
+
+      if (browserResponse.outcome === "success" || browserResponse.outcome === "empty") {
+        browserBackedMode = true;
+      }
+
+      return browserResponse;
+    },
   };
 }

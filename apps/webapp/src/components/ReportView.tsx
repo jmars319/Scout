@@ -10,6 +10,69 @@ function humanize(value: string): string {
     .join(" ");
 }
 
+function describeProviderName(value: string): string {
+  if (value.includes(" + ")) {
+    return value
+      .split(" + ")
+      .map((part) => describeProviderName(part))
+      .join(" + ");
+  }
+
+  if (value === "duckduckgo_html") {
+    return "DuckDuckGo live";
+  }
+
+  if (value === "bing_html") {
+    return "Bing live";
+  }
+
+  if (value === "google_html") {
+    return "Google live";
+  }
+
+  if (value === "seeded_stub") {
+    return "Seeded fallback";
+  }
+
+  return humanize(value);
+}
+
+function describeQueryVariantLabel(label: string): string {
+  if (label === "raw") {
+    return "As Typed";
+  }
+
+  if (label === "normalized") {
+    return "Cleaned";
+  }
+
+  if (label === "singularized") {
+    return "Singular";
+  }
+
+  return humanize(label);
+}
+
+function describeAttemptOutcome(outcome: string): string {
+  if (outcome === "parse_error") {
+    return "Parse Issue";
+  }
+
+  if (outcome === "network_error") {
+    return "Network Issue";
+  }
+
+  if (outcome === "http_error") {
+    return "HTTP Issue";
+  }
+
+  if (outcome === "empty") {
+    return "No Results";
+  }
+
+  return humanize(outcome);
+}
+
 function toneForQuality(quality: string): "neutral" | "good" | "warn" | "danger" {
   if (quality === "strong") {
     return "good";
@@ -197,10 +260,10 @@ export function ReportView({ report }: { report: ScoutRunReport }) {
         <Metric label="Shortlist" value={report.shortlist.length} tone="warn" />
       </MetricGrid>
 
-      <div className="scout-grid two-up">
+      <div className="scout-grid report-overview-grid">
         <Panel title="Market Summary">
           <div className="tag-row" style={{ marginBottom: "0.9rem" }}>
-            <Tag tone="good">{report.searchSource}</Tag>
+            <Tag tone="good">{describeProviderName(report.searchSource)}</Tag>
             <Tag tone={toneForSampleQuality(report.summary.sampleQuality)}>
               {humanize(report.summary.sampleQuality)}
             </Tag>
@@ -249,7 +312,9 @@ export function ReportView({ report }: { report: ScoutRunReport }) {
 
         <Panel title="Acquisition">
           <div className="tag-row" style={{ marginBottom: "0.9rem" }}>
-            <Tag tone={toneForAcquisitionTrust(report)}>{report.acquisition.provider}</Tag>
+            <Tag tone={toneForAcquisitionTrust(report)}>
+              {describeProviderName(report.acquisition.provider)}
+            </Tag>
             {report.acquisition.fallbackUsed ? <Tag tone="warn">Fallback Used</Tag> : null}
             <Tag tone={toneForSampleQuality(report.acquisition.sampleQuality)}>
               {humanize(report.acquisition.sampleQuality)}
@@ -278,7 +343,7 @@ export function ReportView({ report }: { report: ScoutRunReport }) {
                 key={source.source}
                 tone={source.kind === "fallback" ? "warn" : "neutral"}
               >
-                {source.source} kept {source.selectedCandidateCount}
+                {describeProviderName(source.source)} kept {source.selectedCandidateCount}
               </Tag>
             ))}
           </div>
@@ -286,7 +351,7 @@ export function ReportView({ report }: { report: ScoutRunReport }) {
           <div className="section-stack" style={{ marginTop: "1rem" }}>
             <div className="section-label">Query Variants</div>
             {acquisitionVariants.length > 0 ? (
-              <table className="finding-table">
+              <table className="finding-table acquisition-table">
                 <thead>
                   <tr>
                     <th>Variant</th>
@@ -298,7 +363,7 @@ export function ReportView({ report }: { report: ScoutRunReport }) {
                 <tbody>
                   {acquisitionVariants.map((variant) => (
                     <tr key={`${variant.label}-${variant.query}`}>
-                      <td>{humanize(variant.label)}</td>
+                      <td>{describeQueryVariantLabel(variant.label)}</td>
                       <td>{variant.query}</td>
                       <td>{variant.rawResultCount}</td>
                       <td>{variant.acceptedResultCount}</td>
@@ -316,7 +381,7 @@ export function ReportView({ report }: { report: ScoutRunReport }) {
           {acquisitionSources.length > 0 ? (
             <div className="section-stack" style={{ marginTop: "1rem" }}>
               <div className="section-label">Source Contribution</div>
-              <table className="finding-table">
+              <table className="finding-table acquisition-table">
                 <thead>
                   <tr>
                     <th>Source</th>
@@ -328,7 +393,7 @@ export function ReportView({ report }: { report: ScoutRunReport }) {
                 <tbody>
                   {acquisitionSources.map((source) => (
                     <tr key={`${source.kind}-${source.source}`}>
-                      <td>{source.source}</td>
+                      <td>{describeProviderName(source.source)}</td>
                       <td>{humanize(source.kind)}</td>
                       <td>{source.rawCandidateCount}</td>
                       <td>{source.selectedCandidateCount}</td>
@@ -342,7 +407,7 @@ export function ReportView({ report }: { report: ScoutRunReport }) {
           {degradedLiveAttempts.length > 0 ? (
             <div className="section-stack" style={{ marginTop: "1rem" }}>
               <div className="section-label">Live Provider Attempts</div>
-              <table className="finding-table">
+              <table className="finding-table acquisition-table">
                 <thead>
                   <tr>
                     <th>Provider</th>
@@ -354,9 +419,9 @@ export function ReportView({ report }: { report: ScoutRunReport }) {
                 <tbody>
                   {degradedLiveAttempts.map((attempt) => (
                     <tr key={`${attempt.provider}-${attempt.variantLabel}-${attempt.query}-${attempt.outcome}`}>
-                      <td>{attempt.provider}</td>
-                      <td>{humanize(attempt.variantLabel)}</td>
-                      <td>{humanize(attempt.outcome)}</td>
+                      <td>{describeProviderName(attempt.provider)}</td>
+                      <td>{describeQueryVariantLabel(attempt.variantLabel)}</td>
+                      <td>{describeAttemptOutcome(attempt.outcome)}</td>
                       <td>{attempt.rawResultCount}</td>
                     </tr>
                   ))}
@@ -406,11 +471,11 @@ export function ReportView({ report }: { report: ScoutRunReport }) {
 
       <Panel
         title="Shortlist"
-        description="Highest-priority opportunities ranked from Scout's deterministic presence and audit rules."
+        description="Highest-priority business opportunities ranked from Scout's deterministic presence and audit rules. Directory and marketplace pages stay below in the full market picture."
       >
         {report.shortlist.length > 0 ? (
           <ul className="shortlist">
-            {report.shortlist.map((lead) => (
+            {report.shortlist.map((lead, index) => (
               <li key={lead.candidateId} className="report-card">
                 <header>
                   <div>
@@ -419,7 +484,7 @@ export function ReportView({ report }: { report: ScoutRunReport }) {
                       {lead.primaryUrl}
                     </Link>
                   </div>
-                  <Tag tone="warn">Priority {lead.priorityScore}</Tag>
+                  <Tag tone="warn">Shortlist #{index + 1}</Tag>
                 </header>
 
                 <div className="tag-row">

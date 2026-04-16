@@ -1,11 +1,12 @@
 import type { CSSProperties, PropsWithChildren, ReactNode } from "react";
 
 const panelStyle: CSSProperties = {
-  background: "rgba(255, 255, 255, 0.82)",
-  border: "1px solid rgba(15, 23, 42, 0.1)",
+  background: "var(--surface-strong)",
+  border: "1px solid var(--line)",
   borderRadius: "20px",
+  minWidth: 0,
   padding: "1.25rem",
-  boxShadow: "0 24px 60px rgba(15, 23, 42, 0.08)"
+  boxShadow: "var(--panel-shadow)"
 };
 
 export function AppFrame({
@@ -30,7 +31,7 @@ export function AppFrame({
               letterSpacing: "0.14em",
               fontSize: "0.75rem",
               fontWeight: 700,
-              color: "#0f766e",
+              color: "var(--accent)",
               marginBottom: "0.75rem"
             }}
           >
@@ -51,7 +52,14 @@ export function AppFrame({
               {title}
             </h1>
             {description ? (
-              <p style={{ margin: "1rem 0 0", color: "#334155", fontSize: "1.02rem", lineHeight: 1.6 }}>
+              <p
+                style={{
+                  margin: "1rem 0 0",
+                  color: "var(--muted)",
+                  fontSize: "1.02rem",
+                  lineHeight: 1.6
+                }}
+              >
                 {description}
               </p>
             ) : null}
@@ -73,7 +81,16 @@ export function Panel({
     <section style={panelStyle}>
       {title ? <h2 style={{ marginTop: 0, marginBottom: "0.5rem", fontSize: "1.1rem" }}>{title}</h2> : null}
       {description ? (
-        <p style={{ marginTop: 0, marginBottom: "1rem", color: "#475569", lineHeight: 1.55 }}>{description}</p>
+        <p
+          style={{
+            marginTop: 0,
+            marginBottom: "1rem",
+            color: "var(--muted)",
+            lineHeight: 1.55
+          }}
+        >
+          {description}
+        </p>
       ) : null}
       {children}
     </section>
@@ -96,13 +113,28 @@ export function MetricGrid({ children }: PropsWithChildren) {
 
 export function Metric({ label, value, tone = "neutral" }: { label: string; value: ReactNode; tone?: "neutral" | "good" | "warn"; }) {
   const color =
-    tone === "good" ? "#166534" : tone === "warn" ? "#9a3412" : "#0f172a";
+    tone === "good"
+      ? "var(--tone-good-ink)"
+      : tone === "warn"
+        ? "var(--tone-warn-ink)"
+        : "var(--tone-neutral-ink)";
   const background =
-    tone === "good" ? "rgba(34, 197, 94, 0.12)" : tone === "warn" ? "rgba(249, 115, 22, 0.12)" : "rgba(15, 23, 42, 0.05)";
+    tone === "good"
+      ? "var(--tone-good-bg)"
+      : tone === "warn"
+        ? "var(--tone-warn-bg)"
+        : "var(--metric-neutral-bg)";
 
   return (
     <div style={{ ...panelStyle, padding: "1rem", background }}>
-      <div style={{ fontSize: "0.8rem", textTransform: "uppercase", letterSpacing: "0.08em", color: "#475569" }}>
+      <div
+        style={{
+          fontSize: "0.8rem",
+          textTransform: "uppercase",
+          letterSpacing: "0.08em",
+          color: "var(--muted)"
+        }}
+      >
         {label}
       </div>
       <div style={{ marginTop: "0.35rem", fontSize: "1.7rem", fontWeight: 700, color }}>{value}</div>
@@ -115,10 +147,10 @@ export function Tag({
   tone = "neutral"
 }: PropsWithChildren<{ tone?: "neutral" | "good" | "warn" | "danger" }>) {
   const styles: Record<string, CSSProperties> = {
-    neutral: { background: "rgba(15, 23, 42, 0.08)", color: "#0f172a" },
-    good: { background: "rgba(34, 197, 94, 0.12)", color: "#166534" },
-    warn: { background: "rgba(249, 115, 22, 0.14)", color: "#9a3412" },
-    danger: { background: "rgba(239, 68, 68, 0.12)", color: "#991b1b" }
+    neutral: { background: "var(--tone-neutral-bg)", color: "var(--tone-neutral-ink)" },
+    good: { background: "var(--tone-good-bg)", color: "var(--tone-good-ink)" },
+    warn: { background: "var(--tone-warn-bg)", color: "var(--tone-warn-ink)" },
+    danger: { background: "var(--tone-danger-bg)", color: "var(--tone-danger-ink)" }
   };
 
   return (

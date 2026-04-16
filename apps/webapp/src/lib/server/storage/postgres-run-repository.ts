@@ -157,9 +157,23 @@ export function createPostgresRunRepository() {
         ${record.acquisition?.provider ?? null},
         ${
           record.acquisition
-            ? record.acquisition.fallbackUsed
-              ? `${record.acquisition.provider} + seeded_stub`
-              : record.acquisition.provider
+            ? (() => {
+                const selectedSources = [
+                  ...new Set(
+                    record.acquisition.candidateSources
+                      .filter((source) => source.selectedCandidateCount > 0)
+                      .map((source) => source.source)
+                  )
+                ];
+
+                if (selectedSources.length > 0) {
+                  return selectedSources.join(" + ");
+                }
+
+                return record.acquisition.fallbackUsed
+                  ? `${record.acquisition.provider} + seeded_stub`
+                  : record.acquisition.provider;
+              })()
             : null
         },
         ${record.acquisition?.sampleQuality ?? record.businessResults?.summary.sampleQuality ?? null},

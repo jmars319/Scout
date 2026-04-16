@@ -5,7 +5,7 @@
 - `apps/webapp`
   The active Next.js product surface. Owns the server-side search provider, Playwright audit implementation, local evidence storage, and run APIs.
 - `apps/desktopapp`
-  Scaffold-only app for a future operator shell. It typechecks and verifies, but does not expose a runtime surface yet.
+  Active Electron shell that boots the local web app plus worker in development and can also be packaged into a macOS `.app`/`.dmg` without forking product logic.
 - `apps/mobileapp`
   Scaffold-only app for future expansion. It typechecks and verifies, but does not expose a runtime surface yet.
 

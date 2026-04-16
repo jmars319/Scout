@@ -29,7 +29,7 @@ export interface ScoutLimits {
   maxCandidates: number;
 }
 
-export type SearchProviderName = "duckduckgo_html" | "seeded_stub";
+export type SearchProviderName = "duckduckgo_html" | "google_html" | "seeded_stub";
 
 export interface EvidenceStorageConfig {
   driver: "local" | "s3";
@@ -43,6 +43,12 @@ export interface DatabaseConfig {
 export interface WorkerConfig {
   pollMs: number;
   staleRunMs: number;
+}
+
+export interface InteractiveSearchConfig {
+  enabled: boolean;
+  timeoutMs: number;
+  profileDir?: string;
 }
 
 export function getAppName(source: Record<string, string | undefined> = process.env): string {
@@ -64,9 +70,13 @@ export function getSearchProviderName(
 ): SearchProviderName {
   const providerName = source.SCOUT_SEARCH_PROVIDER?.trim() || "duckduckgo_html";
 
-  if (providerName !== "duckduckgo_html" && providerName !== "seeded_stub") {
+  if (
+    providerName !== "duckduckgo_html" &&
+    providerName !== "google_html" &&
+    providerName !== "seeded_stub"
+  ) {
     throw new Error(
-      `SCOUT_SEARCH_PROVIDER must be "duckduckgo_html" or "seeded_stub", received "${providerName}".`
+      `SCOUT_SEARCH_PROVIDER must be "duckduckgo_html", "google_html", or "seeded_stub", received "${providerName}".`
     );
   }
 
@@ -108,5 +118,19 @@ export function getWorkerConfig(
   return {
     pollMs: Number.isFinite(pollMs) && pollMs > 0 ? pollMs : 2000,
     staleRunMs: Number.isFinite(staleRunMs) && staleRunMs > 0 ? staleRunMs : 2_700_000
+  };
+}
+
+export function getInteractiveSearchConfig(
+  source: Record<string, string | undefined> = process.env
+): InteractiveSearchConfig {
+  const enabledValue = source.SCOUT_INTERACTIVE_SEARCH?.trim().toLowerCase();
+  const timeoutMs = Number(source.SCOUT_INTERACTIVE_SEARCH_TIMEOUT_MS ?? 180_000);
+  const profileDir = source.SCOUT_INTERACTIVE_SEARCH_PROFILE_DIR?.trim();
+
+  return {
+    enabled: enabledValue === "1" || enabledValue === "true" || enabledValue === "yes",
+    timeoutMs: Number.isFinite(timeoutMs) && timeoutMs >= 30_000 ? timeoutMs : 180_000,
+    ...(profileDir ? { profileDir } : {})
   };
 }

@@ -5,9 +5,11 @@ node_modules
 out
 dist
 coverage
+apps/desktopapp/.desktop-runtime
 .env
 .env.*
 !.env.example
+.local/
 *.tsbuildinfo
 pnpm-debug.log*
 npm-debug.log*

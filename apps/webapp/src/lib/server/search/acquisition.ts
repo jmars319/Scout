@@ -50,6 +50,17 @@ interface VariantAccumulator {
   sources: Set<string>;
 }
 
+function shouldQueryProviderVariant(
+  provider: SearchProviderAdapter,
+  variantLabel: string
+): boolean {
+  if (provider.name === "bing_html" || provider.name === "google_html") {
+    return variantLabel === "raw";
+  }
+
+  return true;
+}
+
 function slugify(value: string): string {
   return value
     .toLowerCase()
@@ -413,6 +424,22 @@ function buildDiagnosticsNotes(input: {
   }
 
   if (
+    input.providerAttempts.some((attempt) =>
+      attempt.detail?.includes("manual human confirmation")
+    )
+  ) {
+    notes.push("At least one live provider required in-browser human confirmation before Scout could keep results.");
+  }
+
+  if (
+    input.providerAttempts.some((attempt) =>
+      attempt.detail?.includes("not completed before timeout")
+    )
+  ) {
+    notes.push("Scout opened a browser confirmation window for a blocked live provider, but the challenge was not completed in time.");
+  }
+
+  if (
     input.providerAttempts.some((attempt) => attempt.kind === "live" && attempt.outcome === "parse_error")
   ) {
     notes.push("Scout received at least one live provider page it could not parse cleanly.");
@@ -523,7 +550,7 @@ export async function acquireCandidates(input: {
   liveProviders: SearchProviderAdapter[];
   limits: SearchLimits;
   useFallbackOnly?: boolean;
-  fallbackProvider: SearchProviderAdapter;
+  fallbackProvider?: SearchProviderAdapter;
 }): Promise<ScoutAcquisitionResult> {
   const queryVariants = buildQueryVariants(input.intent);
   const variantStats = new Map<string, VariantAccumulator>(
@@ -549,6 +576,10 @@ export async function acquireCandidates(input: {
       const variantStat = ensureVariantAccumulator(variantStats, variant.label, variant.query);
 
       for (const provider of input.liveProviders) {
+        if (!shouldQueryProviderVariant(provider, variant.label)) {
+          continue;
+        }
+
         const response = await provider.executeQuery(variant.query, input.limits.maxCandidates);
         recordProviderAttempt({
           attempts: providerAttempts,
@@ -610,9 +641,12 @@ export async function acquireCandidates(input: {
     uniqueCandidates.push(candidate);
   }
 
-  let fallbackUsed = Boolean(input.useFallbackOnly);
+  let fallbackUsed = Boolean(input.useFallbackOnly && input.fallbackProvider);
 
-  if (uniqueCandidates.length < input.limits.minCandidates || input.useFallbackOnly) {
+  if (
+    input.fallbackProvider &&
+    (uniqueCandidates.length < input.limits.minCandidates || input.useFallbackOnly)
+  ) {
     const fallbackVariantLabel = "fallback_catalog";
     const fallbackQuery = input.intent.searchQuery;
     const fallbackStat = ensureVariantAccumulator(
@@ -734,7 +768,7 @@ export async function acquireCandidates(input: {
     fallbackTriggers
   });
   const diagnostics: AcquisitionDiagnostics = {
-    provider: input.liveProviders[0]?.name ?? input.fallbackProvider.name,
+    provider: input.liveProviders[0]?.name ?? input.fallbackProvider?.name ?? "unresolved",
     fallbackUsed,
     rawCandidateCount: rawSequence,
     selectedCandidateCount: selected.length,
