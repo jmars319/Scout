@@ -6,8 +6,10 @@ import { useState } from "react";
 import { outreachDraftResponseSchema } from "@scout/api-contracts";
 import type {
   LeadOpportunity,
+  OutreachContactChannel,
   OutreachDraft,
   OutreachLength,
+  OutreachPhoneTalkingPoints,
   OutreachTone
 } from "@scout/domain";
 import { Tag } from "@scout/ui";
@@ -22,11 +24,18 @@ interface OutreachWorkspaceProps {
   model?: string | undefined;
 }
 
+type BusyState = "analyze" | "generate" | "save";
+
 interface DraftEditorState {
   tone: OutreachTone;
   length: OutreachLength;
+  recommendedChannel?: OutreachDraft["recommendedChannel"];
+  contactChannels: OutreachContactChannel[];
+  contactRationale: string[];
   subjectLine: string;
   body: string;
+  shortMessage: string;
+  phoneTalkingPoints?: OutreachPhoneTalkingPoints;
   grounding: string[];
   updatedAt?: string;
 }
@@ -34,6 +43,42 @@ interface DraftEditorState {
 interface DraftMessage {
   text: string;
   tone: "neutral" | "good" | "danger";
+}
+
+function draftToEditor(
+  draft: OutreachDraft,
+  fallbackGrounding: string[]
+): DraftEditorState {
+  return {
+    tone: draft.tone,
+    length: draft.length,
+    recommendedChannel: draft.recommendedChannel,
+    contactChannels: draft.contactChannels,
+    contactRationale: draft.contactRationale,
+    subjectLine: draft.subjectLine,
+    body: draft.body,
+    shortMessage: draft.shortMessage ?? "",
+    ...(draft.phoneTalkingPoints ? { phoneTalkingPoints: draft.phoneTalkingPoints } : {}),
+    grounding: draft.grounding.length > 0 ? draft.grounding : fallbackGrounding,
+    updatedAt: draft.updatedAt
+  };
+}
+
+function buildEmptyEditor(
+  lead: LeadOpportunity,
+  defaultTone: OutreachTone,
+  defaultLength: OutreachLength
+): DraftEditorState {
+  return {
+    tone: defaultTone,
+    length: defaultLength,
+    contactChannels: [],
+    contactRationale: [],
+    subjectLine: "",
+    body: "",
+    shortMessage: "",
+    grounding: lead.reasons.slice(0, 4)
+  };
 }
 
 function buildInitialEditors(
@@ -47,25 +92,11 @@ function buildInitialEditors(
   return Object.fromEntries(
     leads.map((lead) => {
       const existingDraft = draftMap.get(lead.candidateId);
-
       return [
         lead.candidateId,
         existingDraft
-          ? {
-              tone: existingDraft.tone,
-              length: existingDraft.length,
-              subjectLine: existingDraft.subjectLine,
-              body: existingDraft.body,
-              grounding: existingDraft.grounding,
-              updatedAt: existingDraft.updatedAt
-            }
-          : {
-              tone: defaultTone,
-              length: defaultLength,
-              subjectLine: "",
-              body: "",
-              grounding: lead.reasons.slice(0, 4)
-            }
+          ? draftToEditor(existingDraft, lead.reasons.slice(0, 4))
+          : buildEmptyEditor(lead, defaultTone, defaultLength)
       ];
     })
   );
@@ -76,6 +107,76 @@ function humanize(value: string): string {
     .split("_")
     .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
     .join(" ");
+}
+
+function normalizePhoneTalkingPoints(
+  value: DraftEditorState["phoneTalkingPoints"]
+): OutreachPhoneTalkingPoints | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const opener = value.opener.trim();
+  const keyPoints = value.keyPoints.map((point) => point.trim()).filter(Boolean);
+  const close = value.close.trim();
+
+  if (!opener && keyPoints.length === 0 && !close) {
+    return undefined;
+  }
+
+  return {
+    opener,
+    keyPoints,
+    close
+  };
+}
+
+function formatPhoneTalkingPoints(value?: OutreachPhoneTalkingPoints): string {
+  if (!value) {
+    return "";
+  }
+
+  return [
+    "Opener:",
+    value.opener,
+    "",
+    "Key points:",
+    ...value.keyPoints.map((point) => `- ${point}`),
+    "",
+    "Close:",
+    value.close
+  ]
+    .join("\n")
+    .trim();
+}
+
+function resolveRecommendedChannel(editor: DraftEditorState): OutreachContactChannel | null {
+  if (editor.recommendedChannel) {
+    const matched = editor.contactChannels.find(
+      (channel) => channel.kind === editor.recommendedChannel
+    );
+    if (matched) {
+      return matched;
+    }
+  }
+
+  return editor.contactChannels[0] ?? null;
+}
+
+function resolveBusyMessage(busyState?: BusyState): string | null {
+  if (busyState === "analyze") {
+    return "Scout is inspecting the business presence for the best contact path.";
+  }
+
+  if (busyState === "generate") {
+    return "Scout is generating the outreach pack from the saved findings and contact fit.";
+  }
+
+  if (busyState === "save") {
+    return "Scout is saving this outreach pack locally.";
+  }
+
+  return null;
 }
 
 export function OutreachWorkspace({
@@ -90,7 +191,7 @@ export function OutreachWorkspace({
   const [editors, setEditors] = useState<Record<string, DraftEditorState>>(() =>
     buildInitialEditors(leads, initialDrafts, defaultTone, defaultLength)
   );
-  const [busyByCandidate, setBusyByCandidate] = useState<Record<string, "generate" | "save">>({});
+  const [busyByCandidate, setBusyByCandidate] = useState<Record<string, BusyState>>({});
   const [messageByCandidate, setMessageByCandidate] = useState<Record<string, DraftMessage>>({});
 
   function updateEditor(
@@ -110,14 +211,82 @@ export function OutreachWorkspace({
     });
   }
 
+  function applySavedDraft(candidateId: string, lead: LeadOpportunity, draft: OutreachDraft) {
+    setEditors((current) => ({
+      ...current,
+      [candidateId]: draftToEditor(draft, lead.reasons.slice(0, 4))
+    }));
+  }
+
+  async function handleAnalyze(candidateId: string) {
+    const lead = leads.find((item) => item.candidateId === candidateId);
+    if (!lead) {
+      return;
+    }
+
+    setBusyByCandidate((current) => ({ ...current, [candidateId]: "analyze" }));
+    setMessageByCandidate((current) => {
+      const next = { ...current };
+      delete next[candidateId];
+      return next;
+    });
+
+    try {
+      const response = await fetch(`/api/runs/${runId}/outreach/${candidateId}`, {
+        method: "POST"
+      });
+      const payload = outreachDraftResponseSchema.parse(await response.json());
+      const draft = payload.draft;
+
+      if (!response.ok || !draft) {
+        throw new Error(payload.errorMessage || "Scout could not analyze contact fit.");
+      }
+
+      applySavedDraft(candidateId, lead, draft);
+      const recommendedChannel =
+        draft.contactChannels.find((channel) => channel.kind === draft.recommendedChannel) ??
+        draft.contactChannels[0];
+
+      setMessageByCandidate((current) => ({
+        ...current,
+        [candidateId]: {
+          text: recommendedChannel
+            ? `Contact fit refreshed. Best first path: ${recommendedChannel.label}.`
+            : "Contact fit refreshed, but Scout still could not find a direct channel.",
+          tone: "good"
+        }
+      }));
+    } catch (error) {
+      setMessageByCandidate((current) => ({
+        ...current,
+        [candidateId]: {
+          text: error instanceof Error ? error.message : "Unknown contact analysis failure.",
+          tone: "danger"
+        }
+      }));
+    } finally {
+      setBusyByCandidate((current) => {
+        const next = { ...current };
+        delete next[candidateId];
+        return next;
+      });
+    }
+  }
+
   async function handleGenerate(candidateId: string) {
+    const lead = leads.find((item) => item.candidateId === candidateId);
     const editor = editors[candidateId];
-    if (!editor) {
+
+    if (!lead || !editor) {
       return;
     }
 
     setBusyByCandidate((current) => ({ ...current, [candidateId]: "generate" }));
-    setMessageByCandidate((current) => ({ ...current, [candidateId]: { text: "", tone: "neutral" } }));
+    setMessageByCandidate((current) => {
+      const next = { ...current };
+      delete next[candidateId];
+      return next;
+    });
 
     try {
       const response = await fetch(`/api/runs/${runId}/outreach`, {
@@ -132,27 +301,17 @@ export function OutreachWorkspace({
         })
       });
       const payload = outreachDraftResponseSchema.parse(await response.json());
-
       const draft = payload.draft;
+
       if (!response.ok || !draft) {
-        throw new Error(payload.errorMessage || "Scout could not generate an outreach draft.");
+        throw new Error(payload.errorMessage || "Scout could not generate the outreach pack.");
       }
 
-      setEditors((current) => ({
-        ...current,
-        [candidateId]: {
-          tone: draft.tone,
-          length: draft.length,
-          subjectLine: draft.subjectLine,
-          body: draft.body,
-          grounding: draft.grounding,
-          updatedAt: draft.updatedAt
-        }
-      }));
+      applySavedDraft(candidateId, lead, draft);
       setMessageByCandidate((current) => ({
         ...current,
         [candidateId]: {
-          text: model ? `Draft refreshed with ${model}.` : "Draft refreshed.",
+          text: model ? `Outreach pack refreshed with ${model}.` : "Outreach pack refreshed.",
           tone: "good"
         }
       }));
@@ -174,13 +333,19 @@ export function OutreachWorkspace({
   }
 
   async function handleSave(candidateId: string) {
+    const lead = leads.find((item) => item.candidateId === candidateId);
     const editor = editors[candidateId];
-    if (!editor) {
+
+    if (!lead || !editor) {
       return;
     }
 
     setBusyByCandidate((current) => ({ ...current, [candidateId]: "save" }));
-    setMessageByCandidate((current) => ({ ...current, [candidateId]: { text: "", tone: "neutral" } }));
+    setMessageByCandidate((current) => {
+      const next = { ...current };
+      delete next[candidateId];
+      return next;
+    });
 
     try {
       const response = await fetch(`/api/runs/${runId}/outreach/${candidateId}`, {
@@ -192,31 +357,23 @@ export function OutreachWorkspace({
           tone: editor.tone,
           length: editor.length,
           subjectLine: editor.subjectLine,
-          body: editor.body
+          body: editor.body,
+          shortMessage: editor.shortMessage,
+          phoneTalkingPoints: normalizePhoneTalkingPoints(editor.phoneTalkingPoints)
         })
       });
       const payload = outreachDraftResponseSchema.parse(await response.json());
-
       const draft = payload.draft;
+
       if (!response.ok || !draft) {
-        throw new Error(payload.errorMessage || "Scout could not save the outreach draft.");
+        throw new Error(payload.errorMessage || "Scout could not save the outreach pack.");
       }
 
-      setEditors((current) => ({
-        ...current,
-        [candidateId]: {
-          tone: draft.tone,
-          length: draft.length,
-          subjectLine: draft.subjectLine,
-          body: draft.body,
-          grounding: draft.grounding,
-          updatedAt: draft.updatedAt
-        }
-      }));
+      applySavedDraft(candidateId, lead, draft);
       setMessageByCandidate((current) => ({
         ...current,
         [candidateId]: {
-          text: "Draft saved locally.",
+          text: "Outreach pack saved locally.",
           tone: "good"
         }
       }));
@@ -237,7 +394,7 @@ export function OutreachWorkspace({
     }
   }
 
-  async function handleCopy(candidateId: string) {
+  async function handleCopyEmail(candidateId: string) {
     const editor = editors[candidateId];
     if (!editor?.subjectLine.trim() || !editor.body.trim()) {
       return;
@@ -248,7 +405,61 @@ export function OutreachWorkspace({
       setMessageByCandidate((current) => ({
         ...current,
         [candidateId]: {
-          text: "Draft copied to clipboard.",
+          text: "Email draft copied to clipboard.",
+          tone: "good"
+        }
+      }));
+    } catch (error) {
+      setMessageByCandidate((current) => ({
+        ...current,
+        [candidateId]: {
+          text: error instanceof Error ? error.message : "Clipboard copy failed.",
+          tone: "danger"
+        }
+      }));
+    }
+  }
+
+  async function handleCopyShortMessage(candidateId: string) {
+    const editor = editors[candidateId];
+    if (!editor?.shortMessage.trim()) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(editor.shortMessage);
+      setMessageByCandidate((current) => ({
+        ...current,
+        [candidateId]: {
+          text: "Short-form outreach copied to clipboard.",
+          tone: "good"
+        }
+      }));
+    } catch (error) {
+      setMessageByCandidate((current) => ({
+        ...current,
+        [candidateId]: {
+          text: error instanceof Error ? error.message : "Clipboard copy failed.",
+          tone: "danger"
+        }
+      }));
+    }
+  }
+
+  async function handleCopyPhoneTalkingPoints(candidateId: string) {
+    const editor = editors[candidateId];
+    const phoneText = formatPhoneTalkingPoints(editor?.phoneTalkingPoints);
+
+    if (!phoneText) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(phoneText);
+      setMessageByCandidate((current) => ({
+        ...current,
+        [candidateId]: {
+          text: "Phone talking points copied to clipboard.",
           tone: "good"
         }
       }));
@@ -275,9 +486,9 @@ export function OutreachWorkspace({
     <div className="outreach-stack">
       <div className="outreach-banner">
         <div>
-          <strong>Desktop-first local drafting.</strong>{" "}
-          Generated drafts are saved with this run on your machine and can be edited before you copy
-          them out.
+          <strong>Desktop-first local outreach.</strong>{" "}
+          Scout can inspect contact paths, recommend the best first channel, and save an email,
+          short-form version, and phone talking points with this run on your machine.
         </div>
         <div className="tag-row">
           <Tag tone={aiAvailable ? "good" : "warn"}>
@@ -289,23 +500,28 @@ export function OutreachWorkspace({
 
       {!aiAvailable ? (
         <p className="muted" style={{ margin: 0 }}>
-          Set <code>OPENAI_API_KEY</code> to generate grounded drafts automatically. Manual edits can
-          still be saved locally.
+          Set <code>OPENAI_API_KEY</code> to generate the full outreach pack automatically. Contact
+          analysis and manual edits can still be saved locally.
         </p>
       ) : null}
 
       <ul className="shortlist">
         {leads.map((lead) => {
-          const editor = editors[lead.candidateId] ?? {
-            tone: defaultTone,
-            length: defaultLength,
-            subjectLine: "",
-            body: "",
-            grounding: lead.reasons.slice(0, 4)
-          };
+          const editor = editors[lead.candidateId] ?? buildEmptyEditor(lead, defaultTone, defaultLength);
           const busyState = busyByCandidate[lead.candidateId];
           const message = messageByCandidate[lead.candidateId];
-          const canSave = editor.subjectLine.trim().length > 0 && editor.body.trim().length >= 20;
+          const busyMessage = resolveBusyMessage(busyState);
+          const recommendedChannel = resolveRecommendedChannel(editor);
+          const hasEmailDraft = editor.subjectLine.trim().length > 0 && editor.body.trim().length > 0;
+          const hasShortMessage = editor.shortMessage.trim().length > 0;
+          const hasPhoneTalkingPoints = Boolean(formatPhoneTalkingPoints(editor.phoneTalkingPoints));
+          const canSave =
+            editor.contactChannels.length > 0 ||
+            editor.contactRationale.length > 0 ||
+            editor.subjectLine.trim().length > 0 ||
+            editor.body.trim().length > 0 ||
+            hasShortMessage ||
+            hasPhoneTalkingPoints;
 
           return (
             <li key={lead.candidateId} className="report-card">
@@ -319,6 +535,7 @@ export function OutreachWorkspace({
                 <div className="tag-row">
                   <Tag tone="warn">{aiAvailable ? "Outreach Ready" : "Manual Draft"}</Tag>
                   <Tag>{humanize(lead.presenceQuality)}</Tag>
+                  {recommendedChannel ? <Tag tone="good">Best fit: {recommendedChannel.label}</Tag> : null}
                 </div>
               </header>
 
@@ -351,11 +568,23 @@ export function OutreachWorkspace({
               <div className="outreach-toolbar">
                 <button
                   className="secondary-button"
+                  disabled={busyState === "analyze"}
+                  onClick={() => void handleAnalyze(lead.candidateId)}
+                  type="button"
+                >
+                  {busyState === "analyze" ? "Analyzing..." : "Analyze Contact Fit"}
+                </button>
+                <button
+                  className="secondary-button"
                   disabled={!aiAvailable || busyState === "generate"}
                   onClick={() => void handleGenerate(lead.candidateId)}
                   type="button"
                 >
-                  {busyState === "generate" ? "Generating..." : editor.body ? "Regenerate" : "Generate Draft"}
+                  {busyState === "generate"
+                    ? "Generating..."
+                    : hasEmailDraft || hasShortMessage || hasPhoneTalkingPoints
+                      ? "Regenerate Pack"
+                      : "Generate Outreach Pack"}
                 </button>
                 <button
                   className="secondary-button"
@@ -363,21 +592,86 @@ export function OutreachWorkspace({
                   onClick={() => void handleSave(lead.candidateId)}
                   type="button"
                 >
-                  {busyState === "save" ? "Saving..." : "Save Local Draft"}
+                  {busyState === "save" ? "Saving..." : "Save Local Pack"}
                 </button>
                 <button
                   className="secondary-button"
-                  disabled={!canSave}
-                  onClick={() => void handleCopy(lead.candidateId)}
+                  disabled={!hasEmailDraft}
+                  onClick={() => void handleCopyEmail(lead.candidateId)}
                   type="button"
                 >
-                  Copy Draft
+                  Copy Email
                 </button>
+                <button
+                  className="secondary-button"
+                  disabled={!hasShortMessage}
+                  onClick={() => void handleCopyShortMessage(lead.candidateId)}
+                  type="button"
+                >
+                  Copy Short Version
+                </button>
+                <button
+                  className="secondary-button"
+                  disabled={!hasPhoneTalkingPoints}
+                  onClick={() => void handleCopyPhoneTalkingPoints(lead.candidateId)}
+                  type="button"
+                >
+                  Copy Phone Notes
+                </button>
+              </div>
+
+              {busyMessage ? <div className="status-note neutral">{busyMessage}</div> : null}
+
+              <div className="section-stack">
+                <div className="section-label">Contact Fit</div>
+                {editor.contactChannels.length > 0 ? (
+                  <>
+                    <div className="tag-row">
+                      {editor.contactChannels.map((channel) => (
+                        <Tag
+                          key={`${channel.kind}:${channel.url ?? channel.value ?? channel.label}`}
+                          tone={
+                            channel.kind === recommendedChannel?.kind && channel.url === recommendedChannel?.url
+                              ? "good"
+                              : "neutral"
+                          }
+                        >
+                          {channel.label}
+                        </Tag>
+                      ))}
+                    </div>
+                    <ul className="note-list">
+                      {editor.contactRationale.map((reason) => (
+                        <li key={reason}>{reason}</li>
+                      ))}
+                    </ul>
+                    <ul className="note-list">
+                      {editor.contactChannels.map((channel) => (
+                        <li
+                          key={`detail-${channel.kind}:${channel.url ?? channel.value ?? channel.label}`}
+                        >
+                          <strong>{channel.label}.</strong> {channel.reason}{" "}
+                          {channel.value ? <span>{channel.value}</span> : null}{" "}
+                          {channel.url ? (
+                            <a className="inline-link" href={channel.url} target="_blank" rel="noreferrer">
+                              Open
+                            </a>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                ) : (
+                  <p className="muted" style={{ margin: 0 }}>
+                    Analyze this lead to let Scout inspect the site and suggest the strongest first
+                    contact path.
+                  </p>
+                )}
               </div>
 
               <div className="field-stack">
                 <label className="section-label" htmlFor={`subject-${lead.candidateId}`}>
-                  Subject
+                  Email Subject
                 </label>
                 <input
                   className="draft-input"
@@ -395,7 +689,7 @@ export function OutreachWorkspace({
 
               <div className="field-stack">
                 <label className="section-label" htmlFor={`body-${lead.candidateId}`}>
-                  Draft
+                  Email Draft
                 </label>
                 <textarea
                   className="draft-textarea"
@@ -406,9 +700,103 @@ export function OutreachWorkspace({
                       body: event.target.value
                     }))
                   }
-                  placeholder="Outreach draft body"
+                  placeholder="Full outreach email"
                   value={editor.body}
                 />
+              </div>
+
+              <div className="field-stack">
+                <label className="section-label" htmlFor={`short-${lead.candidateId}`}>
+                  Short Version
+                </label>
+                <textarea
+                  className="draft-textarea"
+                  id={`short-${lead.candidateId}`}
+                  onChange={(event) =>
+                    updateEditor(lead.candidateId, (current) => ({
+                      ...current,
+                      shortMessage: event.target.value
+                    }))
+                  }
+                  placeholder="Short message for a contact form, social DM, or concise follow-up"
+                  style={{ minHeight: "7rem" }}
+                  value={editor.shortMessage}
+                />
+              </div>
+
+              <div className="section-stack">
+                <div className="section-label">Phone Talking Points</div>
+                <div className="field-stack">
+                  <label className="muted" htmlFor={`phone-opener-${lead.candidateId}`}>
+                    Opener
+                  </label>
+                  <textarea
+                    className="draft-textarea"
+                    id={`phone-opener-${lead.candidateId}`}
+                    onChange={(event) =>
+                      updateEditor(lead.candidateId, (current) => ({
+                        ...current,
+                        phoneTalkingPoints: {
+                          opener: event.target.value,
+                          keyPoints: current.phoneTalkingPoints?.keyPoints ?? [],
+                          close: current.phoneTalkingPoints?.close ?? ""
+                        }
+                      }))
+                    }
+                    placeholder="Short phone opener"
+                    style={{ minHeight: "5rem" }}
+                    value={editor.phoneTalkingPoints?.opener ?? ""}
+                  />
+                </div>
+
+                <div className="field-stack">
+                  <label className="muted" htmlFor={`phone-points-${lead.candidateId}`}>
+                    Key Points
+                  </label>
+                  <textarea
+                    className="draft-textarea"
+                    id={`phone-points-${lead.candidateId}`}
+                    onChange={(event) =>
+                      updateEditor(lead.candidateId, (current) => ({
+                        ...current,
+                        phoneTalkingPoints: {
+                          opener: current.phoneTalkingPoints?.opener ?? "",
+                          keyPoints: event.target.value
+                            .split("\n")
+                            .map((point) => point.trim())
+                            .filter(Boolean),
+                          close: current.phoneTalkingPoints?.close ?? ""
+                        }
+                      }))
+                    }
+                    placeholder="One point per line"
+                    style={{ minHeight: "7rem" }}
+                    value={(editor.phoneTalkingPoints?.keyPoints ?? []).join("\n")}
+                  />
+                </div>
+
+                <div className="field-stack">
+                  <label className="muted" htmlFor={`phone-close-${lead.candidateId}`}>
+                    Close
+                  </label>
+                  <textarea
+                    className="draft-textarea"
+                    id={`phone-close-${lead.candidateId}`}
+                    onChange={(event) =>
+                      updateEditor(lead.candidateId, (current) => ({
+                        ...current,
+                        phoneTalkingPoints: {
+                          opener: current.phoneTalkingPoints?.opener ?? "",
+                          keyPoints: current.phoneTalkingPoints?.keyPoints ?? [],
+                          close: event.target.value
+                        }
+                      }))
+                    }
+                    placeholder="Suggested close or next-step ask"
+                    style={{ minHeight: "5rem" }}
+                    value={editor.phoneTalkingPoints?.close ?? ""}
+                  />
+                </div>
               </div>
 
               <div className="section-stack">
@@ -417,7 +805,7 @@ export function OutreachWorkspace({
                   {editor.grounding.length > 0 ? (
                     editor.grounding.map((reason) => <li key={reason}>{reason}</li>)
                   ) : (
-                    <li>Scout will attach grounded reasons after the first save or generation.</li>
+                    <li>Scout will attach grounded reasons after the first analysis, save, or generation.</li>
                   )}
                 </ul>
               </div>
@@ -428,7 +816,7 @@ export function OutreachWorkspace({
                 </div>
               ) : null}
 
-              {message?.text ? (
+              {!busyMessage && message?.text ? (
                 <div className={`status-note ${message.tone}`}>{message.text}</div>
               ) : null}
             </li>

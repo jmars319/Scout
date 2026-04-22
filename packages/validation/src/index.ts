@@ -6,6 +6,7 @@ import {
   confidenceLevels,
   findingSeverities,
   marketSampleQualities,
+  outreachChannelKinds,
   outreachLengths,
   outreachTones,
   opportunityTypes,
@@ -214,8 +215,28 @@ export const outreachDraftSchema = z.object({
   primaryUrl: z.url(),
   tone: z.enum(outreachTones),
   length: z.enum(outreachLengths),
+  recommendedChannel: z.enum(outreachChannelKinds).optional(),
+  contactChannels: z.array(
+    z.object({
+      kind: z.enum(outreachChannelKinds),
+      label: z.string(),
+      value: z.string().optional(),
+      url: z.string().optional(),
+      score: z.number().int().nonnegative(),
+      reason: z.string()
+    })
+  ),
+  contactRationale: z.array(z.string()),
   subjectLine: z.string(),
   body: z.string(),
+  shortMessage: z.string().optional(),
+  phoneTalkingPoints: z
+    .object({
+      opener: z.string(),
+      keyPoints: z.array(z.string()),
+      close: z.string()
+    })
+    .optional(),
   grounding: z.array(z.string()),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),

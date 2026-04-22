@@ -1,4 +1,11 @@
-import type { OutreachDraft, OutreachLength, OutreachTone } from "@scout/domain";
+import type {
+  OutreachChannelKind,
+  OutreachContactChannel,
+  OutreachDraft,
+  OutreachLength,
+  OutreachPhoneTalkingPoints,
+  OutreachTone
+} from "@scout/domain";
 import { outreachDraftSchema } from "@scout/validation";
 
 import { getPostgresClient } from "./postgres-client.ts";
@@ -13,8 +20,13 @@ interface OutreachDraftRow {
   primary_url: string;
   tone: OutreachTone;
   draft_length: OutreachLength;
+  recommended_channel: OutreachChannelKind | null;
+  contact_channels: OutreachContactChannel[];
+  contact_rationale: string[];
   subject_line: string;
   body: string;
+  short_message: string | null;
+  phone_talking_points: OutreachPhoneTalkingPoints | null;
   grounding: OutreachDraft["grounding"];
   model: string | null;
 }
@@ -26,8 +38,13 @@ export interface SaveOutreachDraftInput {
   primaryUrl: string;
   tone: OutreachTone;
   length: OutreachLength;
+  recommendedChannel?: OutreachChannelKind | undefined;
+  contactChannels: OutreachContactChannel[];
+  contactRationale: string[];
   subjectLine: string;
   body: string;
+  shortMessage?: string | undefined;
+  phoneTalkingPoints?: OutreachPhoneTalkingPoints | undefined;
   grounding: string[];
   model?: string | undefined;
 }
@@ -42,6 +59,33 @@ function createDraftId(runId: string, candidateId: string): string {
   return `${runId}:${candidateId}`;
 }
 
+function serializeContactChannels(
+  channels: OutreachContactChannel[]
+): Array<Record<string, number | string | undefined>> {
+  return channels.map((channel) => ({
+    kind: channel.kind,
+    label: channel.label,
+    value: channel.value,
+    url: channel.url,
+    score: channel.score,
+    reason: channel.reason
+  }));
+}
+
+function serializePhoneTalkingPoints(
+  phoneTalkingPoints: OutreachPhoneTalkingPoints | undefined
+): Record<string, string | string[]> | null {
+  if (!phoneTalkingPoints) {
+    return null;
+  }
+
+  return {
+    opener: phoneTalkingPoints.opener,
+    keyPoints: phoneTalkingPoints.keyPoints,
+    close: phoneTalkingPoints.close
+  };
+}
+
 function mapRowToDraft(row: OutreachDraftRow): OutreachDraft {
   return outreachDraftSchema.parse({
     draftId: row.draft_id,
@@ -51,8 +95,13 @@ function mapRowToDraft(row: OutreachDraftRow): OutreachDraft {
     primaryUrl: row.primary_url,
     tone: row.tone,
     length: row.draft_length,
+    ...(row.recommended_channel ? { recommendedChannel: row.recommended_channel } : {}),
+    contactChannels: row.contact_channels,
+    contactRationale: row.contact_rationale,
     subjectLine: row.subject_line,
     body: row.body,
+    ...(row.short_message ? { shortMessage: row.short_message } : {}),
+    ...(row.phone_talking_points ? { phoneTalkingPoints: row.phone_talking_points } : {}),
     grounding: row.grounding,
     createdAt: new Date(row.created_at).toISOString(),
     updatedAt: new Date(row.updated_at).toISOString(),
@@ -76,8 +125,13 @@ export function createOutreachDraftRepository(): OutreachDraftRepository {
           primary_url,
           tone,
           draft_length,
+          recommended_channel,
+          contact_channels,
+          contact_rationale,
           subject_line,
           body,
+          short_message,
+          phone_talking_points,
           grounding,
           model
         from scout_outreach_drafts
@@ -100,8 +154,13 @@ export function createOutreachDraftRepository(): OutreachDraftRepository {
           primary_url,
           tone,
           draft_length,
+          recommended_channel,
+          contact_channels,
+          contact_rationale,
           subject_line,
           body,
+          short_message,
+          phone_talking_points,
           grounding,
           model
         from scout_outreach_drafts
@@ -125,8 +184,13 @@ export function createOutreachDraftRepository(): OutreachDraftRepository {
           primary_url,
           tone,
           draft_length,
+          recommended_channel,
+          contact_channels,
+          contact_rationale,
           subject_line,
           body,
+          short_message,
+          phone_talking_points,
           grounding,
           model
         )
@@ -140,8 +204,13 @@ export function createOutreachDraftRepository(): OutreachDraftRepository {
           ${input.primaryUrl},
           ${input.tone},
           ${input.length},
+          ${input.recommendedChannel ?? null},
+          ${sql.json(serializeContactChannels(input.contactChannels))},
+          ${sql.json(input.contactRationale)},
           ${input.subjectLine},
           ${input.body},
+          ${input.shortMessage ?? null},
+          ${sql.json(serializePhoneTalkingPoints(input.phoneTalkingPoints))},
           ${sql.json(input.grounding)},
           ${input.model ?? null}
         )
@@ -152,8 +221,13 @@ export function createOutreachDraftRepository(): OutreachDraftRepository {
           primary_url = excluded.primary_url,
           tone = excluded.tone,
           draft_length = excluded.draft_length,
+          recommended_channel = excluded.recommended_channel,
+          contact_channels = excluded.contact_channels,
+          contact_rationale = excluded.contact_rationale,
           subject_line = excluded.subject_line,
           body = excluded.body,
+          short_message = excluded.short_message,
+          phone_talking_points = excluded.phone_talking_points,
           grounding = excluded.grounding,
           model = excluded.model
         returning
@@ -166,8 +240,13 @@ export function createOutreachDraftRepository(): OutreachDraftRepository {
           primary_url,
           tone,
           draft_length,
+          recommended_channel,
+          contact_channels,
+          contact_rationale,
           subject_line,
           body,
+          short_message,
+          phone_talking_points,
           grounding,
           model
       `;

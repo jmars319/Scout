@@ -72,12 +72,26 @@ create table if not exists scout_outreach_drafts (
   primary_url text not null,
   tone text not null check (tone in ('calm', 'direct', 'friendly')),
   draft_length text not null check (draft_length in ('brief', 'standard')),
+  recommended_channel text check (
+    recommended_channel is null
+    or recommended_channel in ('email', 'contact_form', 'phone', 'facebook_dm', 'instagram_dm', 'linkedin_message', 'website')
+  ),
+  contact_channels jsonb not null default '[]'::jsonb,
+  contact_rationale jsonb not null default '[]'::jsonb,
   subject_line text not null,
   body text not null,
+  short_message text,
+  phone_talking_points jsonb,
   grounding jsonb not null default '[]'::jsonb,
   model text,
   unique (run_id, candidate_id)
 );
+
+alter table scout_outreach_drafts add column if not exists recommended_channel text;
+alter table scout_outreach_drafts add column if not exists contact_channels jsonb not null default '[]'::jsonb;
+alter table scout_outreach_drafts add column if not exists contact_rationale jsonb not null default '[]'::jsonb;
+alter table scout_outreach_drafts add column if not exists short_message text;
+alter table scout_outreach_drafts add column if not exists phone_talking_points jsonb;
 
 create index if not exists scout_outreach_drafts_run_updated_idx
   on scout_outreach_drafts (run_id, updated_at desc);

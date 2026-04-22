@@ -1,5 +1,12 @@
 import { getOutreachConfig } from "@scout/config";
-import type { OutreachDraft, OutreachLength, OutreachTone, ScoutRunReport } from "@scout/domain";
+import type {
+  OutreachContactChannel,
+  OutreachDraft,
+  OutreachLength,
+  OutreachPhoneTalkingPoints,
+  OutreachTone,
+  ScoutRunReport
+} from "@scout/domain";
 import { z } from "zod";
 
 import { createRunRepository } from "../storage/run-repository.ts";
@@ -7,11 +14,21 @@ import {
   createOutreachDraftRepository,
   type SaveOutreachDraftInput
 } from "../storage/outreach-draft-repository.ts";
+import { analyzeContactStrategy } from "./contact-strategy.ts";
 import { buildOutreachTargetContext } from "./grounding.ts";
 
 const generatedDraftSchema = z.object({
   subjectLine: z.string().trim().min(1).max(180),
-  body: z.string().trim().min(30).max(5000)
+  body: z.string().trim().min(30).max(5000),
+  shortMessage: z.string().trim().min(20).max(1200),
+  phoneTalkingPoints: z
+    .object({
+      opener: z.string().trim().min(10).max(400),
+      keyPoints: z.array(z.string().trim().min(6).max(280)).min(2).max(4),
+      close: z.string().trim().min(10).max(320)
+    })
+    .nullable()
+    .optional()
 });
 
 export interface OutreachWorkspaceState {
@@ -37,6 +54,16 @@ interface SaveOutreachDraftEditInput {
   length: OutreachLength;
   subjectLine: string;
   body: string;
+  shortMessage?: string | undefined;
+  phoneTalkingPoints?: OutreachPhoneTalkingPoints | undefined;
+}
+
+interface ContactStrategyState {
+  target: ReturnType<typeof buildOutreachTargetContext>;
+  existingDraft: OutreachDraft | null;
+  recommendedChannel?: OutreachDraft["recommendedChannel"];
+  contactChannels: OutreachContactChannel[];
+  contactRationale: string[];
 }
 
 function resolveLengthGuidance(length: OutreachLength): string {
@@ -60,6 +87,7 @@ function resolveToneGuidance(tone: OutreachTone): string {
 function buildPromptPayload(
   report: ScoutRunReport,
   target: ReturnType<typeof buildOutreachTargetContext>,
+  strategy: ContactStrategyState,
   tone: OutreachTone,
   length: OutreachLength
 ) {
@@ -81,6 +109,16 @@ function buildPromptPayload(
       viewport: finding.viewport,
       message: finding.message
     })),
+    recommendedChannel: strategy.recommendedChannel ?? null,
+    contactChannels: strategy.contactChannels.map((channel) => ({
+      kind: channel.kind,
+      label: channel.label,
+      score: channel.score,
+      value: channel.value ?? null,
+      url: channel.url ?? null,
+      reason: channel.reason
+    })),
+    contactRationale: strategy.contactRationale,
     grounding: target.grounding,
     cautionNotes: target.cautionNotes,
     sampleQuality: report.summary.sampleQuality,
@@ -97,8 +135,11 @@ function buildSystemPrompt(tone: OutreachTone, length: OutreachLength): string {
     "Do not mention Scout, AI, automation, scraping, search providers, screenshots, or audits directly.",
     "If the evidence is weak or not confirmed, use softer language like 'may', 'might', or 'could'.",
     "Mention at most two specific website or conversion issues.",
-    "Write plain-text email copy only, with no markdown and no placeholders.",
-    "Return JSON with keys subjectLine and body.",
+    "Write plain-text outreach assets only, with no markdown and no placeholders.",
+    "Return JSON with keys subjectLine, body, shortMessage, and phoneTalkingPoints.",
+    "body should be a full email draft.",
+    "shortMessage should be a compact version suitable for a contact form, social DM, or concise follow-up.",
+    "If phone is a viable channel, include phoneTalkingPoints with opener, keyPoints, and close. Otherwise return null for phoneTalkingPoints.",
     resolveToneGuidance(tone),
     resolveLengthGuidance(length)
   ].join(" ");
@@ -151,6 +192,7 @@ function extractOpenAiErrorMessage(payload: unknown): string | null {
 async function requestGeneratedDraft(
   report: ScoutRunReport,
   candidateId: string,
+  strategy: ContactStrategyState,
   tone: OutreachTone,
   length: OutreachLength
 ) {
@@ -180,7 +222,7 @@ async function requestGeneratedDraft(
             {
               type: "input_text",
               text: `Return only JSON.\n${JSON.stringify(
-                buildPromptPayload(report, target, tone, length),
+                buildPromptPayload(report, target, strategy, tone, length),
                 null,
                 2
               )}`
@@ -227,8 +269,56 @@ async function requireCompletedRunReport(runId: string): Promise<ScoutRunReport>
   return report;
 }
 
+async function resolveContactStrategyState(
+  report: ScoutRunReport,
+  runId: string,
+  candidateId: string,
+  forceRefresh = false
+): Promise<ContactStrategyState> {
+  const target = buildOutreachTargetContext(report, candidateId);
+  const existingDraft = await createOutreachDraftRepository().get(runId, candidateId);
+
+  if (
+    !forceRefresh &&
+    existingDraft &&
+    (existingDraft.recommendedChannel ||
+      existingDraft.contactChannels.length > 0 ||
+      existingDraft.contactRationale.length > 0)
+  ) {
+    return {
+      target,
+      existingDraft,
+      recommendedChannel: existingDraft.recommendedChannel,
+      contactChannels: existingDraft.contactChannels,
+      contactRationale: existingDraft.contactRationale
+    };
+  }
+
+  const presence = report.presences.find((item) => item.candidateId === candidateId);
+  if (!presence) {
+    return {
+      target,
+      existingDraft,
+      recommendedChannel: existingDraft?.recommendedChannel,
+      contactChannels: existingDraft?.contactChannels ?? [],
+      contactRationale:
+        existingDraft?.contactRationale ?? ["Scout could not find a presence record for this business."]
+    };
+  }
+
+  const contactStrategy = await analyzeContactStrategy(presence);
+
+  return {
+    target,
+    existingDraft,
+    recommendedChannel: contactStrategy.channels[0]?.kind,
+    contactChannels: contactStrategy.channels,
+    contactRationale: contactStrategy.rationale
+  };
+}
+
 function buildSaveInputFromTarget(
-  target: ReturnType<typeof buildOutreachTargetContext>,
+  strategy: ContactStrategyState,
   input: {
     runId: string;
     candidateId: string;
@@ -236,21 +326,58 @@ function buildSaveInputFromTarget(
     length: OutreachLength;
     subjectLine: string;
     body: string;
+    shortMessage?: string | undefined;
+    phoneTalkingPoints?: OutreachPhoneTalkingPoints | undefined;
     model?: string | undefined;
   }
 ): SaveOutreachDraftInput {
   return {
     runId: input.runId,
     candidateId: input.candidateId,
-    businessName: target.businessName,
-    primaryUrl: target.primaryUrl,
+    businessName: strategy.target.businessName,
+    primaryUrl: strategy.target.primaryUrl,
     tone: input.tone,
     length: input.length,
+    recommendedChannel: strategy.recommendedChannel,
+    contactChannels: strategy.contactChannels,
+    contactRationale: strategy.contactRationale,
     subjectLine: input.subjectLine,
     body: input.body,
-    grounding: target.grounding,
+    ...(input.shortMessage ? { shortMessage: input.shortMessage } : {}),
+    ...(input.phoneTalkingPoints ? { phoneTalkingPoints: input.phoneTalkingPoints } : {}),
+    grounding: strategy.target.grounding,
     ...(input.model ? { model: input.model } : {})
   };
+}
+
+function buildSaveInputFromStrategy(
+  strategy: ContactStrategyState,
+  input: {
+    runId: string;
+    candidateId: string;
+    tone?: OutreachTone | undefined;
+    length?: OutreachLength | undefined;
+    subjectLine?: string | undefined;
+    body?: string | undefined;
+    shortMessage?: string | undefined;
+    phoneTalkingPoints?: OutreachPhoneTalkingPoints | undefined;
+    model?: string | undefined;
+  }
+): SaveOutreachDraftInput {
+  const config = getOutreachConfig();
+
+  return buildSaveInputFromTarget(strategy, {
+    runId: input.runId,
+    candidateId: input.candidateId,
+    tone: input.tone ?? strategy.existingDraft?.tone ?? config.defaultTone,
+    length: input.length ?? strategy.existingDraft?.length ?? config.defaultLength,
+    subjectLine: input.subjectLine ?? strategy.existingDraft?.subjectLine ?? "",
+    body: input.body ?? strategy.existingDraft?.body ?? "",
+    shortMessage: input.shortMessage ?? strategy.existingDraft?.shortMessage ?? "",
+    phoneTalkingPoints:
+      input.phoneTalkingPoints ?? strategy.existingDraft?.phoneTalkingPoints ?? undefined,
+    model: input.model ?? strategy.existingDraft?.model
+  });
 }
 
 export async function getOutreachWorkspaceState(runId: string): Promise<OutreachWorkspaceState> {
@@ -274,21 +401,43 @@ export async function generateOutreachDraft(
   const tone = input.tone ?? config.defaultTone;
   const length = input.length ?? config.defaultLength;
   const report = await requireCompletedRunReport(input.runId);
-  const { generated, target, model } = await requestGeneratedDraft(
+  const strategy = await resolveContactStrategyState(report, input.runId, input.candidateId);
+  const { generated, model } = await requestGeneratedDraft(
     report,
     input.candidateId,
+    strategy,
     tone,
     length
   );
   const draft = await createOutreachDraftRepository().save(
-    buildSaveInputFromTarget(target, {
+    buildSaveInputFromTarget(strategy, {
       runId: input.runId,
       candidateId: input.candidateId,
       tone,
       length,
       subjectLine: generated.subjectLine,
       body: generated.body,
+      shortMessage: generated.shortMessage,
+      ...(generated.phoneTalkingPoints ? { phoneTalkingPoints: generated.phoneTalkingPoints } : {}),
       model
+    })
+  );
+
+  return {
+    ...(await getOutreachWorkspaceState(input.runId)),
+    draft
+  };
+}
+
+export async function analyzeOutreachCandidate(
+  input: Pick<GenerateOutreachDraftInput, "runId" | "candidateId">
+): Promise<OutreachWorkspaceState & { draft: OutreachDraft }> {
+  const report = await requireCompletedRunReport(input.runId);
+  const strategy = await resolveContactStrategyState(report, input.runId, input.candidateId, true);
+  const draft = await createOutreachDraftRepository().save(
+    buildSaveInputFromStrategy(strategy, {
+      runId: input.runId,
+      candidateId: input.candidateId
     })
   );
 
@@ -302,12 +451,11 @@ export async function saveOutreachDraftEdit(
   input: SaveOutreachDraftEditInput
 ): Promise<OutreachWorkspaceState & { draft: OutreachDraft }> {
   const report = await requireCompletedRunReport(input.runId);
-  const target = buildOutreachTargetContext(report, input.candidateId);
-  const existingDraft = await createOutreachDraftRepository().get(input.runId, input.candidateId);
+  const strategy = await resolveContactStrategyState(report, input.runId, input.candidateId);
   const draft = await createOutreachDraftRepository().save(
-    buildSaveInputFromTarget(target, {
+    buildSaveInputFromStrategy(strategy, {
       ...input,
-      ...(existingDraft?.model ? { model: existingDraft.model } : {})
+      ...(strategy.existingDraft?.model ? { model: strategy.existingDraft.model } : {})
     })
   );
 

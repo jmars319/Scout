@@ -539,7 +539,7 @@ export function ReportView({
 
       <Panel
         title="Outreach Workspace"
-        description="Desktop-first drafting grounded on the stored Scout run. Generate, edit, save, and copy outreach without turning Scout into an email automation system."
+        description="Desktop-first outreach grounded on the stored Scout run. Scout can inspect contact paths, recommend the best first channel, and help draft email, short-form, and phone-ready follow-up without turning the product into an automation system."
       >
         <OutreachWorkspace
           aiAvailable={outreach.aiAvailable}

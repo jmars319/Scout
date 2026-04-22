@@ -26,6 +26,15 @@ export const findingSeverities = ["low", "medium", "high", "critical"] as const;
 export const runStatuses = ["queued", "running", "completed", "failed"] as const;
 export const outreachTones = ["calm", "direct", "friendly"] as const;
 export const outreachLengths = ["brief", "standard"] as const;
+export const outreachChannelKinds = [
+  "email",
+  "contact_form",
+  "phone",
+  "facebook_dm",
+  "instagram_dm",
+  "linkedin_message",
+  "website"
+] as const;
 
 export const viewportKinds = ["desktop", "mobile"] as const;
 export const marketSampleQualities = [
@@ -75,6 +84,7 @@ export type FindingSeverity = (typeof findingSeverities)[number];
 export type RunStatus = (typeof runStatuses)[number];
 export type OutreachTone = (typeof outreachTones)[number];
 export type OutreachLength = (typeof outreachLengths)[number];
+export type OutreachChannelKind = (typeof outreachChannelKinds)[number];
 export type ViewportKind = (typeof viewportKinds)[number];
 export type AuditIssueType = (typeof auditIssueTypes)[number];
 export type MarketSampleQuality = (typeof marketSampleQualities)[number];
@@ -295,10 +305,30 @@ export interface OutreachDraft {
   primaryUrl: string;
   tone: OutreachTone;
   length: OutreachLength;
+  recommendedChannel?: OutreachChannelKind | undefined;
+  contactChannels: OutreachContactChannel[];
+  contactRationale: string[];
   subjectLine: string;
   body: string;
+  shortMessage?: string | undefined;
+  phoneTalkingPoints?: OutreachPhoneTalkingPoints | undefined;
   grounding: string[];
   createdAt: string;
   updatedAt: string;
   model?: string | undefined;
+}
+
+export interface OutreachContactChannel {
+  kind: OutreachChannelKind;
+  label: string;
+  value?: string | undefined;
+  url?: string | undefined;
+  score: number;
+  reason: string;
+}
+
+export interface OutreachPhoneTalkingPoints {
+  opener: string;
+  keyPoints: string[];
+  close: string;
 }

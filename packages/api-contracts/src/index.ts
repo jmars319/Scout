@@ -33,8 +33,16 @@ export const createOutreachDraftRequestSchema = z.object({
 export const updateOutreachDraftRequestSchema = z.object({
   tone: z.enum(outreachTones),
   length: z.enum(outreachLengths),
-  subjectLine: z.string().trim().min(1).max(180),
-  body: z.string().trim().min(20).max(5000)
+  subjectLine: z.string().trim().max(180),
+  body: z.string().trim().max(5000),
+  shortMessage: z.string().trim().max(1200).optional(),
+  phoneTalkingPoints: z
+    .object({
+      opener: z.string().trim().max(400),
+      keyPoints: z.array(z.string().trim().max(280)).max(6),
+      close: z.string().trim().max(320)
+    })
+    .optional()
 });
 
 export const listOutreachDraftsResponseSchema = z.object({

@@ -97,7 +97,7 @@ If a desktop live-search run needs manual confirmation, Scout records that too.
 ## Storage
 
 - Runs: Postgres-backed persisted records in `scout_runs`
-- Outreach drafts: Postgres-backed local records in `scout_outreach_drafts`
+- Outreach packs: Postgres-backed local records in `scout_outreach_drafts`
 - Evidence: local screenshots in `data/evidence`
 - Legacy local runs: import/read compatibility source in `data/runs`
 
@@ -106,14 +106,19 @@ Run storage and evidence storage both live behind explicit adapters. The worker 
 ## Outreach Drafting
 
 - Desktop is the primary operator surface for this workflow. The Next.js app renders the same outreach workspace inside Electron.
-- Outreach drafts are grounded on stored Scout report data:
+- Outreach packs are grounded on stored Scout report data:
   shortlist reasons
   confirmed or high-signal findings
   business breakdown context
-- Drafts are local-first and saved into Postgres so reopening a run in desktop brings them back.
+- Scout can analyze a shortlisted business's contact paths and recommend the strongest first-contact channel before drafting copy.
+- AI generation now returns:
+  email subject and body
+  short-form outreach suitable for contact forms or DMs
+  phone talking points when a call path is viable
+- Outreach packs are local-first and saved into Postgres so reopening a run in desktop brings them back.
 - `OPENAI_API_KEY` enables draft generation through OpenAI.
 - `SCOUT_OUTREACH_MODEL` defaults to `gpt-5-mini`.
-- Manual editing and local save work even when the AI key is absent.
+- Manual contact analysis, editing, and local save work even when the AI key is absent.
 - Scout still does not send outreach automatically. The operator reviews, edits, copies, and sends outside Scout.
 
 ## Worker Model
@@ -133,7 +138,7 @@ Run storage and evidence storage both live behind explicit adapters. The worker 
 - `pnpm run verify:providers`
   Verifies the hardened provider seam directly: DuckDuckGo HTML, Google Search, and Bing parsing success, empty-result detection, block/degradation detection, parse-failure detection, and fallback-trigger diagnostics under degraded live acquisition.
 - `pnpm run verify:outreach`
-  Seeds a completed verification run, saves a local outreach draft through the desktop-first outreach service layer, reads it back from Postgres, and then cleans up the verification records.
+  Seeds a completed verification run, lets Scout analyze a local contact-path fixture, saves a local outreach pack through the desktop-first outreach service layer, reads it back from Postgres, and then cleans up the verification records.
 - `pnpm run verify:persistence`
   Applies the schema, creates a queued run record, saves a completed run record, reads it back, checks recent-run retrieval, and deletes the verification row.
 - `pnpm run verify:queue`
@@ -145,7 +150,7 @@ Run storage and evidence storage both live behind explicit adapters. The worker 
 
 `verify:http-smoke` requires `DATABASE_URL`, local Postgres access, and the Playwright browser installed by `pnpm run bootstrap`. It intentionally forces `SCOUT_SEARCH_PROVIDER=seeded_stub` and smaller candidate limits inside the temporary child processes so the smoke path proves HTTP lifecycle integrity without depending on live-provider stability. That stub path is verification-only; normal Scout runs no longer backfill seeded candidates.
 
-`SCOUT_SEARCH_PROVIDER` is intentionally narrow. Valid values are `duckduckgo_html`, `google_html`, and `seeded_stub`. `seeded_stub` is reserved for verification; normal product runs should stay live-only.
+`SCOUT_SEARCH_PROVIDER` is intentionally narrow. Valid values are `duckduckgo_html`, `google_html`, `bing_html`, and `seeded_stub`. `seeded_stub` is reserved for verification; normal product runs should stay live-only.
 
 Desktop shells automatically set:
 - `SCOUT_INTERACTIVE_SEARCH=1`
