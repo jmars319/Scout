@@ -60,8 +60,20 @@ const MARKETPLACE_DOMAINS = [
   "airbnb.com",
   "joe.coffee"
 ] as const;
+const ROUNDUP_ONLY_DOMAINS = [
+  "threebestrated.com",
+  "expertise.com",
+  "bestprosintown.com",
+  "trustanalytica.com"
+] as const;
 const FACEBOOK_DOMAINS = ["facebook.com", "m.facebook.com"];
 const YELP_DOMAINS = ["yelp.com"];
+const COMMUNITY_DISCUSSION_DOMAINS = [
+  "reddit.com",
+  "redd.it",
+  "zhihu.com",
+  "quora.com"
+] as const;
 const SOCIAL_PROFILE_DOMAINS = [
   "instagram.com",
   "linkedin.com",
@@ -71,10 +83,7 @@ const SOCIAL_PROFILE_DOMAINS = [
   "youtube.com",
   "pinterest.com",
   "nextdoor.com",
-  "reddit.com",
-  "redd.it",
-  "zhihu.com",
-  "quora.com"
+  ...COMMUNITY_DISCUSSION_DOMAINS
 ] as const;
 const OWNED_SITE_HOST_ALLOWLIST = [
   "square.site",
@@ -128,6 +137,25 @@ const GUIDE_TEXT_REGEX_PATTERNS = [
   /\bnear me\b/,
   /\bbest places?\b/,
   /\bpopular\b.+\bas per\b/
+] as const;
+const GUIDE_TITLE_REGEX_PATTERNS = [
+  /^\d+\s+best\b/,
+  /^\d+\s+top\b/,
+  /\btop\s+\d+\b/,
+  /\bbest\b.+\bin\b/,
+  /\bexpert recommended\b/,
+  /\bmade the cut\b/,
+  /\bdefinitive list\b/
+] as const;
+const GUIDE_SNIPPET_PATTERNS = [
+  "want to see who made the cut",
+  "expert recommended",
+  "50-point inspection",
+  "we've gathered up the best",
+  "read real reviews and see ratings",
+  "compare providers and book online",
+  "the definitive list",
+  "our current favorites are listed here"
 ] as const;
 const GUIDE_PATH_PATTERNS = [
   /\/blog(\/|$)/,
@@ -239,6 +267,46 @@ export function evaluatePresenceUrl(input: {
   }
 
   return buildRuleMatch("owned_website", "Result appears to be an owned website.", "confirmed");
+}
+
+export function isAggregatorRoundupResult(input: {
+  url: string;
+  title?: string;
+  snippet?: string;
+}): boolean {
+  const parsedUrl = new URL(input.url);
+  const domain = parsedUrl.hostname.toLowerCase().replace(/^www\./, "");
+  const pathname = parsedUrl.pathname.toLowerCase();
+  const title = (input.title ?? "").toLowerCase();
+  const combinedText = `${input.title ?? ""} ${input.snippet ?? ""}`.toLowerCase();
+  const guideTextMatchCount =
+    countIncludes(combinedText, GUIDE_TEXT_PATTERNS) +
+    countMatchingPatterns(combinedText, GUIDE_TEXT_REGEX_PATTERNS);
+  const guideTitleMatchCount = countMatchingPatterns(title, GUIDE_TITLE_REGEX_PATTERNS);
+  const guideSnippetMatchCount = countIncludes(combinedText, GUIDE_SNIPPET_PATTERNS);
+  const guidePathMatch = matchesAnyPattern(pathname, GUIDE_PATH_PATTERNS);
+  const aggregatorDomain =
+    matchesKnownDomain(domain, DIRECTORY_DOMAINS) ||
+    matchesKnownDomain(domain, MARKETPLACE_DOMAINS) ||
+    matchesKnownDomain(domain, ROUNDUP_ONLY_DOMAINS);
+
+  if (!aggregatorDomain) {
+    return false;
+  }
+
+  return (
+    matchesKnownDomain(domain, ROUNDUP_ONLY_DOMAINS) ||
+    guideTitleMatchCount >= 1 ||
+    guideSnippetMatchCount >= 1 ||
+    guideTextMatchCount >= 1 ||
+    guidePathMatch
+  );
+}
+
+export function isCommunityDiscussionResult(input: { url: string }): boolean {
+  const parsedUrl = new URL(input.url);
+  const domain = parsedUrl.hostname.toLowerCase().replace(/^www\./, "");
+  return matchesKnownDomain(domain, COMMUNITY_DISCUSSION_DOMAINS);
 }
 
 export function deriveBusinessName(candidate: SearchCandidate): string {

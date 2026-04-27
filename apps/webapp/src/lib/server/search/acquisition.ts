@@ -1,4 +1,8 @@
-import { evaluatePresenceUrl } from "../../../../../../packages/domain/src/presence.ts";
+import {
+  evaluatePresenceUrl,
+  isAggregatorRoundupResult,
+  isCommunityDiscussionResult
+} from "../../../../../../packages/domain/src/presence.ts";
 import type {
   AcquisitionAttemptOutcome,
   AcquisitionDiagnostics,
@@ -98,6 +102,21 @@ function isGenericDirectorySearchPage(candidate: RawAcquisitionCandidate): boole
 }
 
 function getDiscardReason(candidate: RawAcquisitionCandidate): string | null {
+  if (isCommunityDiscussionResult({ url: candidate.canonicalUrl })) {
+    return "Community discussion or non-business forum page, not a direct business presence.";
+  }
+
+  if (
+    (candidate.presenceHint === "directory_only" || candidate.presenceHint === "marketplace") &&
+    isAggregatorRoundupResult({
+      url: candidate.canonicalUrl,
+      title: candidate.title,
+      snippet: candidate.snippet
+    })
+  ) {
+    return 'Aggregator, roundup, or "best of" page, not a direct business presence.';
+  }
+
   if (isGenericDirectorySearchPage(candidate)) {
     return "Generic directory or search page, not a business-specific presence.";
   }
@@ -551,6 +570,7 @@ export async function acquireCandidates(input: {
   limits: SearchLimits;
   useFallbackOnly?: boolean;
   fallbackProvider?: SearchProviderAdapter;
+  onProgress?: (workerNote: string) => Promise<void> | void;
 }): Promise<ScoutAcquisitionResult> {
   const queryVariants = buildQueryVariants(input.intent);
   const variantStats = new Map<string, VariantAccumulator>(
@@ -580,7 +600,14 @@ export async function acquireCandidates(input: {
           continue;
         }
 
-        const response = await provider.executeQuery(variant.query, input.limits.maxCandidates);
+        await input.onProgress?.(
+          `Querying ${provider.name} for the ${variant.label.replace(/_/g, " ")} search variant.`
+        );
+        const response = await provider.executeQuery(
+          variant.query,
+          input.limits.maxCandidates,
+          input.onProgress
+        );
         recordProviderAttempt({
           attempts: providerAttempts,
           provider,
@@ -656,7 +683,8 @@ export async function acquireCandidates(input: {
     );
     const fallbackResponse = await input.fallbackProvider.executeQuery(
       fallbackQuery,
-      input.limits.maxCandidates
+      input.limits.maxCandidates,
+      input.onProgress
     );
 
     recordProviderAttempt({

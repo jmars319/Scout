@@ -6,6 +6,7 @@ import {
   confidenceLevels,
   findingSeverities,
   marketSampleQualities,
+  runExecutionStages,
   outreachChannelKinds,
   outreachLengths,
   outreachTones,
@@ -243,6 +244,24 @@ export const outreachDraftSchema = z.object({
   model: z.string().optional()
 });
 
+export const outreachProfileSchema = z.object({
+  profileId: z.string(),
+  senderName: z.string().trim().max(120),
+  companyName: z.string().trim().max(120),
+  roleTitle: z.string().trim().max(120),
+  serviceLine: z.string().trim().max(160),
+  serviceSummary: z.string().trim().max(1200),
+  defaultCallToAction: z.string().trim().max(400),
+  contactEmail: z.string().trim().max(160),
+  contactPhone: z.string().trim().max(80),
+  websiteUrl: z.string().trim().max(240),
+  schedulerUrl: z.string().trim().max(240),
+  toneNotes: z.string().trim().max(700),
+  avoidPhrases: z.array(z.string().trim().max(120)).max(20),
+  signature: z.string().trim().max(500),
+  updatedAt: z.iso.datetime().optional()
+});
+
 export const persistenceMetadataSchema = z.object({
   runStorage: z.literal("postgres"),
   evidenceStorage: z.literal("local"),
@@ -255,8 +274,11 @@ export const runExecutionSchema = z.object({
   queuedAt: z.iso.datetime(),
   startedAt: z.iso.datetime().optional(),
   finishedAt: z.iso.datetime().optional(),
+  heartbeatAt: z.iso.datetime().optional(),
   attemptCount: z.number().int().nonnegative(),
+  stage: z.enum(runExecutionStages).optional(),
   workerId: z.string().optional(),
+  workerNote: z.string().optional(),
   lastErrorMessage: z.string().optional()
 });
 

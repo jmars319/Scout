@@ -20,6 +20,10 @@ export interface ProviderSearchResponse {
 export interface SearchProviderAdapter {
   name: string;
   kind: AcquisitionSourceKind;
-  executeQuery: (query: string, limit: number) => Promise<ProviderSearchResponse>;
+  executeQuery: (
+    query: string,
+    limit: number,
+    onProgress?: (workerNote: string) => Promise<void> | void
+  ) => Promise<ProviderSearchResponse>;
   dispose?: () => Promise<void>;
 }

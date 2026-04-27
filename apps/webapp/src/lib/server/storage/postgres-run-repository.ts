@@ -31,8 +31,11 @@ interface ScoutRunRow {
   queued_at: string | Date;
   started_at: string | Date | null;
   finished_at: string | Date | null;
+  heartbeat_at: string | Date | null;
   attempt_count: number;
+  worker_stage: PersistedRunRecord["execution"]["stage"] | null;
   worker_id: string | null;
+  worker_note: string | null;
   last_error_message: string | null;
   raw_query: string;
   normalized_query: string;
@@ -70,7 +73,10 @@ function mapRowToRecord(row: ScoutRunRow): PersistedRunRecord {
       attemptCount: row.attempt_count,
       ...(row.started_at ? { startedAt: toIsoString(row.started_at) } : {}),
       ...(row.finished_at ? { finishedAt: toIsoString(row.finished_at) } : {}),
+      ...(row.heartbeat_at ? { heartbeatAt: toIsoString(row.heartbeat_at) } : {}),
+      ...(row.worker_stage ? { stage: row.worker_stage } : {}),
       ...(row.worker_id ? { workerId: row.worker_id } : {}),
+      ...(row.worker_note ? { workerNote: row.worker_note } : {}),
       ...(row.last_error_message ? { lastErrorMessage: row.last_error_message } : {})
     },
     input: {
@@ -112,8 +118,11 @@ export function createPostgresRunRepository() {
         queued_at,
         started_at,
         finished_at,
+        heartbeat_at,
         attempt_count,
+        worker_stage,
         worker_id,
+        worker_note,
         last_error_message,
         raw_query,
         normalized_query,
@@ -143,8 +152,11 @@ export function createPostgresRunRepository() {
         ${record.execution.queuedAt},
         ${record.execution.startedAt ?? null},
         ${record.execution.finishedAt ?? null},
+        ${record.execution.heartbeatAt ?? null},
         ${record.execution.attemptCount},
+        ${record.execution.stage ?? null},
         ${record.execution.workerId ?? null},
+        ${record.execution.workerNote ?? null},
         ${record.execution.lastErrorMessage ?? null},
         ${record.input.rawQuery},
         ${record.intent.normalizedQuery},
@@ -193,8 +205,11 @@ export function createPostgresRunRepository() {
         queued_at = excluded.queued_at,
         started_at = excluded.started_at,
         finished_at = excluded.finished_at,
+        heartbeat_at = excluded.heartbeat_at,
         attempt_count = excluded.attempt_count,
+        worker_stage = excluded.worker_stage,
         worker_id = excluded.worker_id,
+        worker_note = excluded.worker_note,
         last_error_message = excluded.last_error_message,
         raw_query = excluded.raw_query,
         normalized_query = excluded.normalized_query,
@@ -223,8 +238,11 @@ export function createPostgresRunRepository() {
         queued_at,
         started_at,
         finished_at,
+        heartbeat_at,
         attempt_count,
+        worker_stage,
         worker_id,
+        worker_note,
         last_error_message,
         raw_query,
         normalized_query,
@@ -265,7 +283,10 @@ export function createPostgresRunRepository() {
           attemptCount: existing.execution.attemptCount,
           finishedAt: new Date().toISOString(),
           ...(existing.execution.startedAt ? { startedAt: existing.execution.startedAt } : {}),
+          ...(existing.execution.heartbeatAt ? { heartbeatAt: existing.execution.heartbeatAt } : {}),
+          ...(existing.execution.stage ? { stage: existing.execution.stage } : {}),
           ...(existing.execution.workerId ? { workerId: existing.execution.workerId } : {}),
+          ...(existing.execution.workerNote ? { workerNote: existing.execution.workerNote } : {}),
           ...(report.errorMessage
             ? { lastErrorMessage: report.errorMessage }
             : existing.execution.lastErrorMessage
@@ -312,8 +333,11 @@ export function createPostgresRunRepository() {
           updated_at = now(),
           started_at = now(),
           finished_at = null,
+          heartbeat_at = now(),
           attempt_count = attempt_count + 1,
+          worker_stage = 'starting',
           worker_id = ${workerId},
+          worker_note = 'Worker claimed the run and is preparing Scout dependencies.',
           last_error_message = null
         where run_id in (select run_id from next_run)
         returning
@@ -325,8 +349,11 @@ export function createPostgresRunRepository() {
           queued_at,
           started_at,
           finished_at,
+          heartbeat_at,
           attempt_count,
+          worker_stage,
           worker_id,
+          worker_note,
           last_error_message,
           raw_query,
           normalized_query,
@@ -359,18 +386,75 @@ export function createPostgresRunRepository() {
           updated_at = now(),
           queued_at = now(),
           finished_at = null,
+          heartbeat_at = now(),
+          worker_stage = 'queued',
           worker_id = null,
+          worker_note = 'Scout worker did not finish the previous attempt. The run was re-queued.',
           last_error_message = coalesce(
             last_error_message,
             'Scout worker did not finish the previous attempt. The run was re-queued.'
           )
         where status = 'running'
-          and started_at is not null
-          and started_at < now() - (${Math.max(staleRunMs, 1000)} * interval '1 millisecond')
+          and coalesce(heartbeat_at, started_at) is not null
+          and coalesce(heartbeat_at, started_at) < now() - (${Math.max(staleRunMs, 1000)} * interval '1 millisecond')
         returning run_id
       `;
 
       return rows.length;
+    },
+
+    async updateProgress(
+      runId: string,
+      progress: {
+        stage?: PersistedRunRecord["execution"]["stage"];
+        workerNote?: string;
+      }
+    ) {
+      const [row] = await sql<ScoutRunRow[]>`
+        update scout_runs
+        set
+          updated_at = now(),
+          heartbeat_at = now(),
+          worker_stage = ${progress.stage ?? null},
+          worker_note = ${progress.workerNote ?? null}
+        where run_id = ${runId}
+          and status = 'running'
+        returning
+          run_id,
+          schema_version,
+          status,
+          created_at,
+          updated_at,
+          queued_at,
+          started_at,
+          finished_at,
+          heartbeat_at,
+          attempt_count,
+          worker_stage,
+          worker_id,
+          worker_note,
+          last_error_message,
+          raw_query,
+          normalized_query,
+          market_term,
+          categories,
+          location_label,
+          location_city,
+          location_region,
+          search_query,
+          search_provider,
+          search_source,
+          sample_quality,
+          acquisition,
+          selected_candidates,
+          business_results,
+          shortlist,
+          notes,
+          error_message,
+          persistence_metadata
+      `;
+
+      return row ? mapRowToRecord(row) : null;
     },
 
     async getRecord(runId: string): Promise<PersistedRunRecord | null> {
@@ -384,8 +468,11 @@ export function createPostgresRunRepository() {
           queued_at,
           started_at,
           finished_at,
+          heartbeat_at,
           attempt_count,
+          worker_stage,
           worker_id,
+          worker_note,
           last_error_message,
           raw_query,
           normalized_query,

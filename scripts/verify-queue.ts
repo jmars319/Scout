@@ -84,19 +84,52 @@ try {
   assert(queuedRecord);
   assert.equal(queuedRecord.status, "queued");
   assert.equal(queuedRecord.execution.attemptCount, 0);
+  assert.equal(queuedRecord.execution.stage, "queued");
+  assert.equal(queuedRecord.execution.workerNote, "Run stored and waiting for a worker.");
+  assert(queuedRecord.execution.heartbeatAt);
+
+  let observedRunningStatus: string | null = null;
+  let observedRunningStage: string | null = null;
+  let observedRunningNote: string | null = null;
+  let observedRunningStartedAt: string | null = null;
+  let observedRunningHeartbeatAt: string | null = null;
 
   await processNextQueuedRun({
     workerId: "verify-queue-worker",
     repository,
-    executeRun: (record) => Promise.resolve(buildVerificationReport(record.runId, record.createdAt))
+    executeRun: async (record, onProgress) => {
+      await onProgress?.({
+        stage: "acquiring_candidates",
+        workerNote: "Queue verification is simulating live acquisition."
+      });
+      const runningRecord = await repository.getRecord(record.runId);
+      if (!runningRecord) {
+        throw new Error("Queue verification could not reload the running record.");
+      }
+      observedRunningStatus = runningRecord.status;
+      observedRunningStage = runningRecord.execution.stage ?? null;
+      observedRunningNote = runningRecord.execution.workerNote ?? null;
+      observedRunningStartedAt = runningRecord.execution.startedAt ?? null;
+      observedRunningHeartbeatAt = runningRecord.execution.heartbeatAt ?? null;
+      return buildVerificationReport(record.runId, record.createdAt);
+    }
   });
+
+  assert.equal(observedRunningStatus, "running");
+  assert.equal(observedRunningStage, "acquiring_candidates");
+  assert.equal(observedRunningNote, "Queue verification is simulating live acquisition.");
+  assert(observedRunningStartedAt);
+  assert(observedRunningHeartbeatAt);
 
   const completedRecord = await repository.getRecord(firstRunId);
   assert(completedRecord);
   assert.equal(completedRecord.status, "completed");
   assert.equal(completedRecord.execution.attemptCount, 1);
+  assert.equal(completedRecord.execution.stage, "completed");
+  assert.equal(completedRecord.execution.workerNote, "Run completed and report saved.");
   assert(completedRecord.execution.startedAt);
   assert(completedRecord.execution.finishedAt);
+  assert(completedRecord.execution.heartbeatAt);
 
   await repository.createQueuedRun({
     runId: secondRunId,
@@ -115,6 +148,8 @@ try {
   assert(failedRecord);
   assert.equal(failedRecord.status, "failed");
   assert.equal(failedRecord.execution.attemptCount, 1);
+  assert.equal(failedRecord.execution.stage, "failed");
+  assert.equal(failedRecord.execution.workerNote, "Queue verification failure.");
   assert.equal(failedRecord.execution.lastErrorMessage, "Queue verification failure.");
 
   console.log("Queue verification passed.");

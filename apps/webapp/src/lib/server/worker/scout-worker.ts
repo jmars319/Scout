@@ -9,12 +9,17 @@ import type { PersistedRunRecord } from "../storage/persisted-run-record.ts";
 import { executeScoutRunRecord } from "./scout-executor.ts";
 
 type WorkerExecutionResult = "idle" | "completed" | "failed";
+const RUN_HEARTBEAT_MS = 8_000;
 
 export interface ProcessNextQueuedRunInput {
   workerId: string;
   repository?: RunRepository;
   executeRun?: (
-    record: Pick<PersistedRunRecord, "runId" | "createdAt" | "input" | "intent">
+    record: Pick<PersistedRunRecord, "runId" | "createdAt" | "input" | "intent">,
+    onProgress?: (update: {
+      stage: PersistedRunRecord["execution"]["stage"];
+      workerNote: string;
+    }) => Promise<void>
   ) => Promise<ScoutRunReport>;
 }
 
@@ -25,7 +30,11 @@ export interface ScoutWorkerOptions {
   once?: boolean;
   repository?: RunRepository;
   executeRun?: (
-    record: Pick<PersistedRunRecord, "runId" | "createdAt" | "input" | "intent">
+    record: Pick<PersistedRunRecord, "runId" | "createdAt" | "input" | "intent">,
+    onProgress?: (update: {
+      stage: PersistedRunRecord["execution"]["stage"];
+      workerNote: string;
+    }) => Promise<void>
   ) => Promise<ScoutRunReport>;
 }
 
@@ -51,9 +60,32 @@ export async function processNextQueuedRun(
   }
 
   try {
-    const report = await executeRun(claimed);
-    await repository.save(report);
-    return { outcome: report.status === "failed" ? "failed" : "completed", runId: claimed.runId };
+    let currentProgress: {
+      stage?: PersistedRunRecord["execution"]["stage"];
+      workerNote?: string;
+    } = {
+      ...(claimed.execution.stage ? { stage: claimed.execution.stage } : {}),
+      ...(claimed.execution.workerNote ? { workerNote: claimed.execution.workerNote } : {})
+    };
+    const heartbeatId = setInterval(() => {
+      void repository.updateProgress(claimed.runId, currentProgress);
+    }, RUN_HEARTBEAT_MS);
+    try {
+      const report = await executeRun(claimed, async (update) => {
+        currentProgress = {
+          stage: update.stage,
+          workerNote: update.workerNote
+        };
+        await repository.updateProgress(claimed.runId, currentProgress);
+      });
+      await repository.save(report);
+      return {
+        outcome: report.status === "failed" ? "failed" : "completed",
+        runId: claimed.runId
+      };
+    } finally {
+      clearInterval(heartbeatId);
+    }
   } catch (error) {
     const failure = buildFailedReport({
       runId: claimed.runId,

@@ -179,6 +179,45 @@ function resolveBusyMessage(busyState?: BusyState): string | null {
   return null;
 }
 
+function hasPhoneNotes(editor: DraftEditorState): boolean {
+  const phone = editor.phoneTalkingPoints;
+
+  if (!phone) {
+    return false;
+  }
+
+  return Boolean(
+    phone.opener.trim() || phone.keyPoints.some((point) => point.trim()) || phone.close.trim()
+  );
+}
+
+function describeLeadCardSummary(lead: LeadOpportunity, editor: DraftEditorState): string {
+  const parts: string[] = [];
+  const recommendedChannel = resolveRecommendedChannel(editor);
+
+  if (recommendedChannel) {
+    parts.push(`Best fit: ${recommendedChannel.label}`);
+  }
+
+  if (editor.subjectLine.trim() && editor.body.trim()) {
+    parts.push("Email draft ready");
+  }
+
+  if (editor.shortMessage.trim()) {
+    parts.push("Short version ready");
+  }
+
+  if (hasPhoneNotes(editor)) {
+    parts.push("Phone notes ready");
+  }
+
+  if (parts.length > 0) {
+    return parts.join(" · ");
+  }
+
+  return lead.reasons[0] ?? "Analyze contact fit or generate an outreach pack.";
+}
+
 export function OutreachWorkspace({
   runId,
   leads,
@@ -193,6 +232,9 @@ export function OutreachWorkspace({
   );
   const [busyByCandidate, setBusyByCandidate] = useState<Record<string, BusyState>>({});
   const [messageByCandidate, setMessageByCandidate] = useState<Record<string, DraftMessage>>({});
+  const [expandedCandidateId, setExpandedCandidateId] = useState<string | null>(
+    () => leads[0]?.candidateId ?? null
+  );
 
   function updateEditor(
     candidateId: string,
@@ -224,6 +266,7 @@ export function OutreachWorkspace({
       return;
     }
 
+    setExpandedCandidateId(candidateId);
     setBusyByCandidate((current) => ({ ...current, [candidateId]: "analyze" }));
     setMessageByCandidate((current) => {
       const next = { ...current };
@@ -281,6 +324,7 @@ export function OutreachWorkspace({
       return;
     }
 
+    setExpandedCandidateId(candidateId);
     setBusyByCandidate((current) => ({ ...current, [candidateId]: "generate" }));
     setMessageByCandidate((current) => {
       const next = { ...current };
@@ -340,6 +384,7 @@ export function OutreachWorkspace({
       return;
     }
 
+    setExpandedCandidateId(candidateId);
     setBusyByCandidate((current) => ({ ...current, [candidateId]: "save" }));
     setMessageByCandidate((current) => {
       const next = { ...current };
@@ -507,14 +552,18 @@ export function OutreachWorkspace({
 
       <ul className="shortlist">
         {leads.map((lead) => {
-          const editor = editors[lead.candidateId] ?? buildEmptyEditor(lead, defaultTone, defaultLength);
+          const editor =
+            editors[lead.candidateId] ?? buildEmptyEditor(lead, defaultTone, defaultLength);
           const busyState = busyByCandidate[lead.candidateId];
           const message = messageByCandidate[lead.candidateId];
           const busyMessage = resolveBusyMessage(busyState);
           const recommendedChannel = resolveRecommendedChannel(editor);
-          const hasEmailDraft = editor.subjectLine.trim().length > 0 && editor.body.trim().length > 0;
+          const isExpanded = expandedCandidateId === lead.candidateId;
+          const cardSummary = describeLeadCardSummary(lead, editor);
+          const hasEmailDraft =
+            editor.subjectLine.trim().length > 0 && editor.body.trim().length > 0;
           const hasShortMessage = editor.shortMessage.trim().length > 0;
-          const hasPhoneTalkingPoints = Boolean(formatPhoneTalkingPoints(editor.phoneTalkingPoints));
+          const hasPhoneTalkingPoints = hasPhoneNotes(editor);
           const canSave =
             editor.contactChannels.length > 0 ||
             editor.contactRationale.length > 0 ||
@@ -524,299 +573,340 @@ export function OutreachWorkspace({
             hasPhoneTalkingPoints;
 
           return (
-            <li key={lead.candidateId} className="report-card">
-              <header>
-                <div>
+            <li
+              key={lead.candidateId}
+              className={`report-card outreach-card ${isExpanded ? "expanded" : "collapsed"}`}
+            >
+              <div className="outreach-card-head">
+                <div className="outreach-card-main">
                   <div style={{ fontSize: "1.08rem", fontWeight: 700 }}>{lead.businessName}</div>
                   <Link className="inline-link" href={lead.primaryUrl} target="_blank">
                     {lead.primaryUrl}
                   </Link>
+                  <div className="muted outreach-card-summary">{cardSummary}</div>
                 </div>
-                <div className="tag-row">
-                  <Tag tone="warn">{aiAvailable ? "Outreach Ready" : "Manual Draft"}</Tag>
-                  <Tag>{humanize(lead.presenceQuality)}</Tag>
-                  {recommendedChannel ? <Tag tone="good">Best fit: {recommendedChannel.label}</Tag> : null}
-                </div>
-              </header>
-
-              <div className="tag-row">
-                {(["calm", "direct", "friendly"] as OutreachTone[]).map((tone) => (
+                <div className="outreach-card-side">
+                  <div className="tag-row">
+                    <Tag tone="warn">{aiAvailable ? "Outreach Ready" : "Manual Draft"}</Tag>
+                    <Tag>{humanize(lead.presenceQuality)}</Tag>
+                    {recommendedChannel ? (
+                      <Tag tone="good">Best fit: {recommendedChannel.label}</Tag>
+                    ) : null}
+                  </div>
                   <button
-                    key={tone}
-                    className={`pill-button ${editor.tone === tone ? "active" : ""}`}
-                    onClick={() => updateEditor(lead.candidateId, (current) => ({ ...current, tone }))}
+                    aria-expanded={isExpanded}
+                    className="secondary-button outreach-card-toggle"
+                    onClick={() =>
+                      setExpandedCandidateId((current) =>
+                        current === lead.candidateId ? null : lead.candidateId
+                      )
+                    }
                     type="button"
                   >
-                    {humanize(tone)}
+                    {isExpanded ? "Collapse" : "Expand"}
                   </button>
-                ))}
+                </div>
               </div>
 
-              <div className="tag-row">
-                {(["brief", "standard"] as OutreachLength[]).map((length) => (
-                  <button
-                    key={length}
-                    className={`pill-button ${editor.length === length ? "active" : ""}`}
-                    onClick={() => updateEditor(lead.candidateId, (current) => ({ ...current, length }))}
-                    type="button"
-                  >
-                    {humanize(length)}
-                  </button>
-                ))}
-              </div>
+              {isExpanded ? (
+                <div className="outreach-card-body">
+                  <div className="tag-row">
+                    {(["calm", "direct", "friendly"] as OutreachTone[]).map((tone) => (
+                      <button
+                        key={tone}
+                        className={`pill-button ${editor.tone === tone ? "active" : ""}`}
+                        onClick={() =>
+                          updateEditor(lead.candidateId, (current) => ({ ...current, tone }))
+                        }
+                        type="button"
+                      >
+                        {humanize(tone)}
+                      </button>
+                    ))}
+                  </div>
 
-              <div className="outreach-toolbar">
-                <button
-                  className="secondary-button"
-                  disabled={busyState === "analyze"}
-                  onClick={() => void handleAnalyze(lead.candidateId)}
-                  type="button"
-                >
-                  {busyState === "analyze" ? "Analyzing..." : "Analyze Contact Fit"}
-                </button>
-                <button
-                  className="secondary-button"
-                  disabled={!aiAvailable || busyState === "generate"}
-                  onClick={() => void handleGenerate(lead.candidateId)}
-                  type="button"
-                >
-                  {busyState === "generate"
-                    ? "Generating..."
-                    : hasEmailDraft || hasShortMessage || hasPhoneTalkingPoints
-                      ? "Regenerate Pack"
-                      : "Generate Outreach Pack"}
-                </button>
-                <button
-                  className="secondary-button"
-                  disabled={!canSave || busyState === "save"}
-                  onClick={() => void handleSave(lead.candidateId)}
-                  type="button"
-                >
-                  {busyState === "save" ? "Saving..." : "Save Local Pack"}
-                </button>
-                <button
-                  className="secondary-button"
-                  disabled={!hasEmailDraft}
-                  onClick={() => void handleCopyEmail(lead.candidateId)}
-                  type="button"
-                >
-                  Copy Email
-                </button>
-                <button
-                  className="secondary-button"
-                  disabled={!hasShortMessage}
-                  onClick={() => void handleCopyShortMessage(lead.candidateId)}
-                  type="button"
-                >
-                  Copy Short Version
-                </button>
-                <button
-                  className="secondary-button"
-                  disabled={!hasPhoneTalkingPoints}
-                  onClick={() => void handleCopyPhoneTalkingPoints(lead.candidateId)}
-                  type="button"
-                >
-                  Copy Phone Notes
-                </button>
-              </div>
+                  <div className="tag-row">
+                    {(["brief", "standard"] as OutreachLength[]).map((length) => (
+                      <button
+                        key={length}
+                        className={`pill-button ${editor.length === length ? "active" : ""}`}
+                        onClick={() =>
+                          updateEditor(lead.candidateId, (current) => ({ ...current, length }))
+                        }
+                        type="button"
+                      >
+                        {humanize(length)}
+                      </button>
+                    ))}
+                  </div>
 
-              {busyMessage ? <div className="status-note neutral">{busyMessage}</div> : null}
+                  <div className="outreach-toolbar">
+                    <button
+                      className="secondary-button"
+                      disabled={busyState === "analyze"}
+                      onClick={() => void handleAnalyze(lead.candidateId)}
+                      type="button"
+                    >
+                      {busyState === "analyze" ? "Analyzing..." : "Analyze Contact Fit"}
+                    </button>
+                    <button
+                      className="secondary-button"
+                      disabled={!aiAvailable || busyState === "generate"}
+                      onClick={() => void handleGenerate(lead.candidateId)}
+                      type="button"
+                    >
+                      {busyState === "generate"
+                        ? "Generating..."
+                        : hasEmailDraft || hasShortMessage || hasPhoneTalkingPoints
+                          ? "Regenerate Pack"
+                          : "Generate Outreach Pack"}
+                    </button>
+                    <button
+                      className="secondary-button"
+                      disabled={!canSave || busyState === "save"}
+                      onClick={() => void handleSave(lead.candidateId)}
+                      type="button"
+                    >
+                      {busyState === "save" ? "Saving..." : "Save Local Pack"}
+                    </button>
+                    <button
+                      className="secondary-button"
+                      disabled={!hasEmailDraft}
+                      onClick={() => void handleCopyEmail(lead.candidateId)}
+                      type="button"
+                    >
+                      Copy Email
+                    </button>
+                    <button
+                      className="secondary-button"
+                      disabled={!hasShortMessage}
+                      onClick={() => void handleCopyShortMessage(lead.candidateId)}
+                      type="button"
+                    >
+                      Copy Short Version
+                    </button>
+                    <button
+                      className="secondary-button"
+                      disabled={!hasPhoneTalkingPoints}
+                      onClick={() => void handleCopyPhoneTalkingPoints(lead.candidateId)}
+                      type="button"
+                    >
+                      Copy Phone Notes
+                    </button>
+                  </div>
 
-              <div className="section-stack">
-                <div className="section-label">Contact Fit</div>
-                {editor.contactChannels.length > 0 ? (
-                  <>
-                    <div className="tag-row">
-                      {editor.contactChannels.map((channel) => (
-                        <Tag
-                          key={`${channel.kind}:${channel.url ?? channel.value ?? channel.label}`}
-                          tone={
-                            channel.kind === recommendedChannel?.kind && channel.url === recommendedChannel?.url
-                              ? "good"
-                              : "neutral"
-                          }
-                        >
-                          {channel.label}
-                        </Tag>
-                      ))}
+                  {busyMessage ? <div className="status-note neutral">{busyMessage}</div> : null}
+
+                  <div className="section-stack">
+                    <div className="section-label">Contact Fit</div>
+                    {editor.contactChannels.length > 0 ? (
+                      <>
+                        <div className="tag-row">
+                          {editor.contactChannels.map((channel) => (
+                            <Tag
+                              key={`${channel.kind}:${channel.url ?? channel.value ?? channel.label}`}
+                              tone={
+                                channel.kind === recommendedChannel?.kind &&
+                                channel.url === recommendedChannel?.url
+                                  ? "good"
+                                  : "neutral"
+                              }
+                            >
+                              {channel.label}
+                            </Tag>
+                          ))}
+                        </div>
+                        <ul className="note-list">
+                          {editor.contactRationale.map((reason, index) => (
+                            <li key={`contact-rationale-${lead.candidateId}-${index}`}>{reason}</li>
+                          ))}
+                        </ul>
+                        <ul className="note-list">
+                          {editor.contactChannels.map((channel) => (
+                            <li
+                              key={`detail-${channel.kind}:${channel.url ?? channel.value ?? channel.label}`}
+                            >
+                              <strong>{channel.label}.</strong> {channel.reason}{" "}
+                              {channel.value ? <span>{channel.value}</span> : null}{" "}
+                              {channel.url ? (
+                                <a
+                                  className="inline-link"
+                                  href={channel.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                >
+                                  Open
+                                </a>
+                              ) : null}
+                            </li>
+                          ))}
+                        </ul>
+                      </>
+                    ) : (
+                      <p className="muted" style={{ margin: 0 }}>
+                        Analyze this lead to let Scout inspect the site and suggest the strongest
+                        first contact path.
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="field-stack">
+                    <label className="section-label" htmlFor={`subject-${lead.candidateId}`}>
+                      Email Subject
+                    </label>
+                    <input
+                      className="draft-input"
+                      id={`subject-${lead.candidateId}`}
+                      onChange={(event) =>
+                        updateEditor(lead.candidateId, (current) => ({
+                          ...current,
+                          subjectLine: event.target.value
+                        }))
+                      }
+                      placeholder="Subject line"
+                      value={editor.subjectLine}
+                    />
+                  </div>
+
+                  <div className="field-stack">
+                    <label className="section-label" htmlFor={`body-${lead.candidateId}`}>
+                      Email Draft
+                    </label>
+                    <textarea
+                      className="draft-textarea"
+                      id={`body-${lead.candidateId}`}
+                      onChange={(event) =>
+                        updateEditor(lead.candidateId, (current) => ({
+                          ...current,
+                          body: event.target.value
+                        }))
+                      }
+                      placeholder="Full outreach email"
+                      value={editor.body}
+                    />
+                  </div>
+
+                  <div className="field-stack">
+                    <label className="section-label" htmlFor={`short-${lead.candidateId}`}>
+                      Short Version
+                    </label>
+                    <textarea
+                      className="draft-textarea"
+                      id={`short-${lead.candidateId}`}
+                      onChange={(event) =>
+                        updateEditor(lead.candidateId, (current) => ({
+                          ...current,
+                          shortMessage: event.target.value
+                        }))
+                      }
+                      placeholder="Short message for a contact form, social DM, or concise follow-up"
+                      style={{ minHeight: "7rem" }}
+                      value={editor.shortMessage}
+                    />
+                  </div>
+
+                  <div className="section-stack">
+                    <div className="section-label">Phone Talking Points</div>
+                    <div className="field-stack">
+                      <label className="muted" htmlFor={`phone-opener-${lead.candidateId}`}>
+                        Opener
+                      </label>
+                      <textarea
+                        className="draft-textarea"
+                        id={`phone-opener-${lead.candidateId}`}
+                        onChange={(event) =>
+                          updateEditor(lead.candidateId, (current) => ({
+                            ...current,
+                            phoneTalkingPoints: {
+                              opener: event.target.value,
+                              keyPoints: current.phoneTalkingPoints?.keyPoints ?? [],
+                              close: current.phoneTalkingPoints?.close ?? ""
+                            }
+                          }))
+                        }
+                        placeholder="Short phone opener"
+                        style={{ minHeight: "5rem" }}
+                        value={editor.phoneTalkingPoints?.opener ?? ""}
+                      />
                     </div>
+
+                    <div className="field-stack">
+                      <label className="muted" htmlFor={`phone-points-${lead.candidateId}`}>
+                        Key Points
+                      </label>
+                      <textarea
+                        className="draft-textarea"
+                        id={`phone-points-${lead.candidateId}`}
+                        onChange={(event) =>
+                          updateEditor(lead.candidateId, (current) => ({
+                            ...current,
+                            phoneTalkingPoints: {
+                              opener: current.phoneTalkingPoints?.opener ?? "",
+                              keyPoints: event.target.value
+                                .split("\n")
+                                .map((point) => point.trim())
+                                .filter(Boolean),
+                              close: current.phoneTalkingPoints?.close ?? ""
+                            }
+                          }))
+                        }
+                        placeholder="One point per line"
+                        style={{ minHeight: "7rem" }}
+                        value={(editor.phoneTalkingPoints?.keyPoints ?? []).join("\n")}
+                      />
+                    </div>
+
+                    <div className="field-stack">
+                      <label className="muted" htmlFor={`phone-close-${lead.candidateId}`}>
+                        Close
+                      </label>
+                      <textarea
+                        className="draft-textarea"
+                        id={`phone-close-${lead.candidateId}`}
+                        onChange={(event) =>
+                          updateEditor(lead.candidateId, (current) => ({
+                            ...current,
+                            phoneTalkingPoints: {
+                              opener: current.phoneTalkingPoints?.opener ?? "",
+                              keyPoints: current.phoneTalkingPoints?.keyPoints ?? [],
+                              close: event.target.value
+                            }
+                          }))
+                        }
+                        placeholder="Suggested close or next-step ask"
+                        style={{ minHeight: "5rem" }}
+                        value={editor.phoneTalkingPoints?.close ?? ""}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="section-stack">
+                    <div className="section-label">Grounded From</div>
                     <ul className="note-list">
-                      {editor.contactRationale.map((reason) => (
-                        <li key={reason}>{reason}</li>
-                      ))}
-                    </ul>
-                    <ul className="note-list">
-                      {editor.contactChannels.map((channel) => (
-                        <li
-                          key={`detail-${channel.kind}:${channel.url ?? channel.value ?? channel.label}`}
-                        >
-                          <strong>{channel.label}.</strong> {channel.reason}{" "}
-                          {channel.value ? <span>{channel.value}</span> : null}{" "}
-                          {channel.url ? (
-                            <a className="inline-link" href={channel.url} target="_blank" rel="noreferrer">
-                              Open
-                            </a>
-                          ) : null}
+                      {editor.grounding.length > 0 ? (
+                        editor.grounding.map((reason, index) => (
+                          <li key={`grounding-${lead.candidateId}-${index}`}>{reason}</li>
+                        ))
+                      ) : (
+                        <li>
+                          Scout will attach grounded reasons after the first analysis, save, or
+                          generation.
                         </li>
-                      ))}
+                      )}
                     </ul>
-                  </>
-                ) : (
-                  <p className="muted" style={{ margin: 0 }}>
-                    Analyze this lead to let Scout inspect the site and suggest the strongest first
-                    contact path.
-                  </p>
-                )}
-              </div>
+                  </div>
 
-              <div className="field-stack">
-                <label className="section-label" htmlFor={`subject-${lead.candidateId}`}>
-                  Email Subject
-                </label>
-                <input
-                  className="draft-input"
-                  id={`subject-${lead.candidateId}`}
-                  onChange={(event) =>
-                    updateEditor(lead.candidateId, (current) => ({
-                      ...current,
-                      subjectLine: event.target.value
-                    }))
-                  }
-                  placeholder="Subject line"
-                  value={editor.subjectLine}
-                />
-              </div>
+                  {editor.updatedAt ? (
+                    <div className="muted" style={{ fontSize: "0.9rem" }}>
+                      Last saved {new Date(editor.updatedAt).toLocaleString()}
+                    </div>
+                  ) : null}
 
-              <div className="field-stack">
-                <label className="section-label" htmlFor={`body-${lead.candidateId}`}>
-                  Email Draft
-                </label>
-                <textarea
-                  className="draft-textarea"
-                  id={`body-${lead.candidateId}`}
-                  onChange={(event) =>
-                    updateEditor(lead.candidateId, (current) => ({
-                      ...current,
-                      body: event.target.value
-                    }))
-                  }
-                  placeholder="Full outreach email"
-                  value={editor.body}
-                />
-              </div>
-
-              <div className="field-stack">
-                <label className="section-label" htmlFor={`short-${lead.candidateId}`}>
-                  Short Version
-                </label>
-                <textarea
-                  className="draft-textarea"
-                  id={`short-${lead.candidateId}`}
-                  onChange={(event) =>
-                    updateEditor(lead.candidateId, (current) => ({
-                      ...current,
-                      shortMessage: event.target.value
-                    }))
-                  }
-                  placeholder="Short message for a contact form, social DM, or concise follow-up"
-                  style={{ minHeight: "7rem" }}
-                  value={editor.shortMessage}
-                />
-              </div>
-
-              <div className="section-stack">
-                <div className="section-label">Phone Talking Points</div>
-                <div className="field-stack">
-                  <label className="muted" htmlFor={`phone-opener-${lead.candidateId}`}>
-                    Opener
-                  </label>
-                  <textarea
-                    className="draft-textarea"
-                    id={`phone-opener-${lead.candidateId}`}
-                    onChange={(event) =>
-                      updateEditor(lead.candidateId, (current) => ({
-                        ...current,
-                        phoneTalkingPoints: {
-                          opener: event.target.value,
-                          keyPoints: current.phoneTalkingPoints?.keyPoints ?? [],
-                          close: current.phoneTalkingPoints?.close ?? ""
-                        }
-                      }))
-                    }
-                    placeholder="Short phone opener"
-                    style={{ minHeight: "5rem" }}
-                    value={editor.phoneTalkingPoints?.opener ?? ""}
-                  />
+                  {!busyMessage && message?.text ? (
+                    <div className={`status-note ${message.tone}`}>{message.text}</div>
+                  ) : null}
                 </div>
-
-                <div className="field-stack">
-                  <label className="muted" htmlFor={`phone-points-${lead.candidateId}`}>
-                    Key Points
-                  </label>
-                  <textarea
-                    className="draft-textarea"
-                    id={`phone-points-${lead.candidateId}`}
-                    onChange={(event) =>
-                      updateEditor(lead.candidateId, (current) => ({
-                        ...current,
-                        phoneTalkingPoints: {
-                          opener: current.phoneTalkingPoints?.opener ?? "",
-                          keyPoints: event.target.value
-                            .split("\n")
-                            .map((point) => point.trim())
-                            .filter(Boolean),
-                          close: current.phoneTalkingPoints?.close ?? ""
-                        }
-                      }))
-                    }
-                    placeholder="One point per line"
-                    style={{ minHeight: "7rem" }}
-                    value={(editor.phoneTalkingPoints?.keyPoints ?? []).join("\n")}
-                  />
-                </div>
-
-                <div className="field-stack">
-                  <label className="muted" htmlFor={`phone-close-${lead.candidateId}`}>
-                    Close
-                  </label>
-                  <textarea
-                    className="draft-textarea"
-                    id={`phone-close-${lead.candidateId}`}
-                    onChange={(event) =>
-                      updateEditor(lead.candidateId, (current) => ({
-                        ...current,
-                        phoneTalkingPoints: {
-                          opener: current.phoneTalkingPoints?.opener ?? "",
-                          keyPoints: current.phoneTalkingPoints?.keyPoints ?? [],
-                          close: event.target.value
-                        }
-                      }))
-                    }
-                    placeholder="Suggested close or next-step ask"
-                    style={{ minHeight: "5rem" }}
-                    value={editor.phoneTalkingPoints?.close ?? ""}
-                  />
-                </div>
-              </div>
-
-              <div className="section-stack">
-                <div className="section-label">Grounded From</div>
-                <ul className="note-list">
-                  {editor.grounding.length > 0 ? (
-                    editor.grounding.map((reason) => <li key={reason}>{reason}</li>)
-                  ) : (
-                    <li>Scout will attach grounded reasons after the first analysis, save, or generation.</li>
-                  )}
-                </ul>
-              </div>
-
-              {editor.updatedAt ? (
-                <div className="muted" style={{ fontSize: "0.9rem" }}>
-                  Last saved {new Date(editor.updatedAt).toLocaleString()}
-                </div>
-              ) : null}
-
-              {!busyMessage && message?.text ? (
+              ) : message?.text ? (
                 <div className={`status-note ${message.tone}`}>{message.text}</div>
               ) : null}
             </li>

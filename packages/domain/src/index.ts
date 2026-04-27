@@ -54,19 +54,41 @@ export async function runScout(
   const now = dependencies.now?.() ?? new Date();
   const runId = dependencies.generateRunId?.() ?? defaultRunId(now);
   const intent = await dependencies.resolveIntent(input);
+  await dependencies.onProgress?.({
+    stage: "acquiring_candidates",
+    workerNote: "Gathering live market candidates from the search providers."
+  });
   const acquisition = await dependencies.searchCandidates(intent);
   const candidates = acquisition.candidates;
+  await dependencies.onProgress?.({
+    stage: "evaluating_presences",
+    workerNote: `Evaluating ${candidates.length} candidate presences and ownership signals.`
+  });
   const presences = await Promise.all(
     candidates.map((candidate) => dependencies.detectPresence(candidate, intent))
   );
 
   const audits: PresenceAuditResult[] = [];
+  const auditEligibleCount = presences.filter((presence) => presence.auditEligible).length;
+  let auditedCount = 0;
+  await dependencies.onProgress?.({
+    stage: "auditing_websites",
+    workerNote:
+      auditEligibleCount > 0
+        ? `Auditing ${auditEligibleCount} owned websites across desktop and mobile.`
+        : "No owned websites qualified for audit. Moving to classification."
+  });
   for (const presence of presences) {
     if (!presence.auditEligible) {
       audits.push(emptyAuditResult(presence.candidateId));
       continue;
     }
 
+    auditedCount += 1;
+    await dependencies.onProgress?.({
+      stage: "auditing_websites",
+      workerNote: `Auditing ${presence.businessName} (${auditedCount} of ${auditEligibleCount}).`
+    });
     audits.push(await dependencies.auditPresence(presence, intent));
   }
 
@@ -94,11 +116,19 @@ export async function runScout(
     findingsByCandidate.set(finding.candidateId, current);
   }
 
+  await dependencies.onProgress?.({
+    stage: "building_shortlist",
+    workerNote: "Classifying findings and building the shortlist."
+  });
   const classifications = enrichedPresences.map((presence) =>
     classifyBusiness(presence, findingsByCandidate.get(presence.candidateId) ?? [])
   );
   const shortlist = buildLeadShortlist(enrichedPresences, classifications, findings).slice(0, 5);
 
+  await dependencies.onProgress?.({
+    stage: "finalizing_report",
+    workerNote: "Finalizing the report and saving the results."
+  });
   const report: ScoutRunReport = {
     schemaVersion: 2,
     runId,

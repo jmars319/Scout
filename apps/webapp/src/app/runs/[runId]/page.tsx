@@ -5,6 +5,7 @@ import { AppFrame } from "@scout/ui";
 
 import { ReportView } from "@/components/ReportView";
 import { RunStatusView } from "@/components/RunStatusView";
+import { ScoutNavigation } from "@/components/ScoutNavigation";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { getOutreachWorkspaceState } from "@/lib/server/outreach/outreach-service";
 import { getScoutRun, getScoutRunRecord } from "@/lib/server/scout-runner";
@@ -31,10 +32,20 @@ export default async function RunPage({
       eyebrow="Scout report"
       title={record.intent.marketTerm}
       description={`Run ${record.runId} for "${record.input.rawQuery}"`}
+      navigation={
+        <ScoutNavigation
+          currentView="run"
+          currentRunId={record.runId}
+          currentRunLabel={record.intent.marketTerm}
+        />
+      }
       actions={
         <div className="header-actions">
-          <Link className="link-button" href="/">
-            New run
+          <Link className="secondary-button" href="/">
+            Home
+          </Link>
+          <Link className="link-button" href="/#new-scan">
+            New scan
           </Link>
           <ThemeToggle />
         </div>

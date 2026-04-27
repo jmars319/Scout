@@ -59,8 +59,8 @@
   anti-bot/block-like pages
   parse failures
   transient network or HTTP failures
-- Google Search can return either a browser-only JavaScript shell or a reCAPTCHA challenge. Scout treats both as degraded and can escalate into the same browser-backed confirmation path in desktop mode.
-- Desktop mode can escalate blocked DuckDuckGo or Google searches into a real browser-backed session so the operator can complete a human challenge and let the run continue.
+- Google Search can return either a browser-only JavaScript shell or a reCAPTCHA challenge. Scout treats both as degraded and does not escalate Google into a manual browser-confirmation path.
+- Desktop mode can escalate blocked DuckDuckGo searches into a real browser-backed session so the operator can complete a human challenge and let the run continue.
 - Seeded fallback is now verification-only. Normal product runs do not backfill live-search failures with seeded candidates.
 - Acquisition diagnostics now record:
   provider attempts
@@ -69,7 +69,7 @@
   caution notes tied to live-provider weakness
 
 If live acquisition is weak, partial, or fallback-heavy, Scout records that in acquisition diagnostics and sample-quality notes.
-If a desktop live-search run needs manual confirmation, Scout records that too.
+If a desktop DuckDuckGo run needs manual confirmation, Scout records that too.
 
 ## Audit Behavior
 
@@ -156,7 +156,7 @@ Desktop shells automatically set:
 - `SCOUT_INTERACTIVE_SEARCH=1`
 - `SCOUT_INTERACTIVE_SEARCH_PROFILE_DIR=<local desktop profile path>`
 
-That allows blocked DuckDuckGo HTML and Google Search runs to open a local browser-backed confirmation window without widening the web product surface.
+That allows blocked DuckDuckGo HTML runs to open a local browser-backed confirmation window without widening the web product surface. Google remains fetch-only.
 Desktop startup also prunes cache-heavy folders inside that profile at most once per 24 hours so `.local` does not grow indefinitely while cookies and session storage stay intact.
 
 ## Desktop And Mobile Surfaces

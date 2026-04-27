@@ -5,7 +5,6 @@ import type {
   ProviderSearchResponse,
   SearchProviderAdapter
 } from "./provider-types.ts";
-import type { InteractiveBrowserSearchSession } from "./interactive-browser.ts";
 
 const REQUEST_TIMEOUT_MS = 12_000;
 const BROWSER_USER_AGENT =
@@ -134,7 +133,7 @@ function detectBrowserOnlyShell(bodyText: string): string | null {
 
   for (const marker of JS_SHELL_MARKERS) {
     if (lowerBody.includes(marker)) {
-      return "Google Search returned a JavaScript shell that Scout can only continue through a browser-rendered session.";
+      return "Google Search returned a JavaScript shell Scout treats as provider degradation instead of opening a manual confirmation flow.";
     }
   }
 
@@ -318,34 +317,11 @@ async function runFetchQuery(query: string): Promise<Response> {
   });
 }
 
-function shouldEscalateToInteractiveSearch(response: ProviderSearchResponse): boolean {
-  return (
-    response.outcome === "blocked" ||
-    (response.outcome === "parse_error" &&
-      response.detail?.includes("browser-rendered session") === true)
-  );
-}
-
-export function createGoogleHtmlProvider(options?: {
-  interactiveSession?: InteractiveBrowserSearchSession | null;
-}): SearchProviderAdapter {
-  const interactiveSession = options?.interactiveSession ?? null;
-  let browserBackedMode = false;
-
+export function createGoogleHtmlProvider(): SearchProviderAdapter {
   return {
     name: "google_html",
     kind: "live",
     async executeQuery(query, limit) {
-      if (browserBackedMode && interactiveSession) {
-        return interactiveSession.search({
-          providerName: "Google Search",
-          query,
-          limit,
-          searchUrl: buildSearchUrl(query),
-          parsePage: parseGoogleHtmlSearchPage
-        });
-      }
-
       let response: Response;
 
       try {
@@ -363,25 +339,7 @@ export function createGoogleHtmlProvider(options?: {
       }
 
       const html = await response.text();
-      const parsed = parseGoogleHtmlSearchPage(html, limit);
-
-      if (!interactiveSession || !shouldEscalateToInteractiveSearch(parsed)) {
-        return parsed;
-      }
-
-      const browserResponse = await interactiveSession.search({
-        providerName: "Google Search",
-        query,
-        limit,
-        searchUrl: buildSearchUrl(query),
-        parsePage: parseGoogleHtmlSearchPage
-      });
-
-      if (browserResponse.outcome === "success" || browserResponse.outcome === "empty") {
-        browserBackedMode = true;
-      }
-
-      return browserResponse;
+      return parseGoogleHtmlSearchPage(html, limit);
     }
   };
 }

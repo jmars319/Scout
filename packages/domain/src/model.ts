@@ -24,6 +24,17 @@ export const confidenceLevels = ["confirmed", "probable", "inferred"] as const;
 
 export const findingSeverities = ["low", "medium", "high", "critical"] as const;
 export const runStatuses = ["queued", "running", "completed", "failed"] as const;
+export const runExecutionStages = [
+  "queued",
+  "starting",
+  "acquiring_candidates",
+  "evaluating_presences",
+  "auditing_websites",
+  "building_shortlist",
+  "finalizing_report",
+  "completed",
+  "failed"
+] as const;
 export const outreachTones = ["calm", "direct", "friendly"] as const;
 export const outreachLengths = ["brief", "standard"] as const;
 export const outreachChannelKinds = [
@@ -82,6 +93,7 @@ export type OpportunityType = (typeof opportunityTypes)[number];
 export type ConfidenceLevel = (typeof confidenceLevels)[number];
 export type FindingSeverity = (typeof findingSeverities)[number];
 export type RunStatus = (typeof runStatuses)[number];
+export type RunExecutionStage = (typeof runExecutionStages)[number];
 export type OutreachTone = (typeof outreachTones)[number];
 export type OutreachLength = (typeof outreachLengths)[number];
 export type OutreachChannelKind = (typeof outreachChannelKinds)[number];
@@ -295,6 +307,24 @@ export interface ScoutRunReport {
   summary: ScoutRunSummary;
   notes: string[];
   errorMessage?: string;
+}
+
+export interface OutreachProfile {
+  profileId: string;
+  senderName: string;
+  companyName: string;
+  roleTitle: string;
+  serviceLine: string;
+  serviceSummary: string;
+  defaultCallToAction: string;
+  contactEmail: string;
+  contactPhone: string;
+  websiteUrl: string;
+  schedulerUrl: string;
+  toneNotes: string;
+  avoidPhrases: string[];
+  signature: string;
+  updatedAt?: string | undefined;
 }
 
 export interface OutreachDraft {

@@ -113,7 +113,7 @@ scout/
   input, queued run, worker execution, report.
 - Completed report views now include a local outreach workspace for shortlist targets. Scout can inspect contact paths, recommend the best first channel, generate email plus short-form plus phone-ready copy, and save everything locally, but it still does not send outreach automatically.
 - The packaged macOS app runs its own bundled `next start` server, bundled worker runtime, and bundled Chromium for audits.
-- Desktop mode also enables manual in-browser confirmation for blocked live-search challenges. If DuckDuckGo or Google serves a human-check page, Scout opens a local browser-backed search window and continues the run after the operator clears it.
+- Desktop mode enables manual in-browser confirmation only for DuckDuckGo. If DuckDuckGo serves a human-check page, Scout can open a local browser-backed search window and continue after the operator clears it. Google is treated as fetch-only and simply degrades if it serves a challenge flow.
 - The packaged app still needs `DATABASE_URL`. When launched outside a shell, it reads env from `~/Library/Application Support/Scout by JAMARQ/.env` or from `Scout.app/Contents/Resources/scout.env` if you place one there before launch.
 
 ## Live Acquisition
@@ -121,7 +121,7 @@ scout/
 - Default live path: DuckDuckGo HTML plus Google Search and Bing HTML as additional live providers on the same narrow seam.
 - Live runs now either keep real live candidates or fail honestly when acquisition returns nothing usable.
 - Acquisition diagnostics record provider attempts, source contribution counts, degradation reasons, and caution notes so the operator can see what happened upstream before a run completed or failed.
-- In desktop mode, blocked live providers can open a real browser-backed challenge window so the operator can confirm the search was human and let Scout continue without synthetic fallback.
+- In desktop mode, DuckDuckGo can open a real browser-backed challenge window so the operator can confirm the search was human and let Scout continue without synthetic fallback. Google does not use that path.
 - Scout still keeps the provider layer intentionally narrow. There is no large multi-vendor search framework here.
 
 ## HTTP Smoke Verification

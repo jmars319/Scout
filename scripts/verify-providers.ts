@@ -227,8 +227,8 @@ async function main(): Promise<void> {
   const parsedGoogleShell = parseGoogleHtmlSearchPage(googleShellHtml, 5);
   assert.equal(parsedGoogleShell.outcome, "parse_error");
   assert(
-    parsedGoogleShell.detail?.includes("browser-rendered session"),
-    "Expected Google JS shell to describe browser-rendered recovery."
+    parsedGoogleShell.detail?.includes("provider degradation"),
+    "Expected Google JS shell to describe degraded fetch-only behavior."
   );
 
   const intent = resolveMarketIntent({

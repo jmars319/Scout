@@ -14,15 +14,18 @@ export function AppFrame({
   description,
   children,
   eyebrow,
-  actions
+  actions,
+  navigation
 }: PropsWithChildren<{
   title: string;
   description?: string;
   eyebrow?: string;
   actions?: ReactNode;
+  navigation?: ReactNode;
 }>) {
   return (
     <main style={{ maxWidth: "1120px", margin: "0 auto", padding: "2.5rem 1.25rem 4rem" }}>
+      {navigation ? <div style={{ marginBottom: "1.25rem" }}>{navigation}</div> : null}
       <header style={{ marginBottom: "2rem" }}>
         {eyebrow ? (
           <div

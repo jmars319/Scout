@@ -45,7 +45,10 @@ export interface RunExecutionInput {
   attemptCount: number;
   startedAt?: string;
   finishedAt?: string;
+  heartbeatAt?: string;
+  stage?: PersistedRunRecord["execution"]["stage"];
   workerId?: string;
+  workerNote?: string;
   lastErrorMessage?: string;
 }
 
@@ -88,7 +91,10 @@ function createExecutionMetadata(input: RunExecutionInput): PersistedRunRecord["
     attemptCount: input.attemptCount,
     ...(input.startedAt ? { startedAt: input.startedAt } : {}),
     ...(input.finishedAt ? { finishedAt: input.finishedAt } : {}),
+    ...(input.heartbeatAt ? { heartbeatAt: input.heartbeatAt } : {}),
+    ...(input.stage ? { stage: input.stage } : {}),
     ...(input.workerId ? { workerId: input.workerId } : {}),
+    ...(input.workerNote ? { workerNote: input.workerNote } : {}),
     ...(input.lastErrorMessage ? { lastErrorMessage: input.lastErrorMessage } : {})
   };
 }
@@ -230,7 +236,10 @@ export function createQueuedPersistedRunRecord(
     notes: [],
     execution: createExecutionMetadata({
       queuedAt: input.createdAt,
-      attemptCount: 0
+      heartbeatAt: input.createdAt,
+      attemptCount: 0,
+      stage: "queued",
+      workerNote: "Run stored and waiting for a worker."
     }),
     persistence: createPersistenceMetadata(input.persistence)
   };
@@ -246,7 +255,13 @@ export function createPersistedRunRecord(
     attemptCount: options.execution?.attemptCount ?? 1,
     ...(options.execution?.startedAt ? { startedAt: options.execution.startedAt } : { startedAt: report.createdAt }),
     finishedAt: updatedAt,
+    heartbeatAt: options.execution?.heartbeatAt ?? updatedAt,
+    stage: report.status === "completed" ? "completed" : "failed",
     ...(options.execution?.workerId ? { workerId: options.execution.workerId } : {}),
+    workerNote:
+      report.status === "completed"
+        ? "Run completed and report saved."
+        : report.errorMessage ?? options.execution?.workerNote ?? "Scout run failed.",
     ...(report.errorMessage || options.execution?.lastErrorMessage
       ? { lastErrorMessage: report.errorMessage ?? options.execution?.lastErrorMessage ?? "Scout run failed." }
       : {})
@@ -337,7 +352,13 @@ function upgradeLegacyV2Record(
       queuedAt: value.createdAt,
       startedAt: value.createdAt,
       finishedAt: value.updatedAt,
+      heartbeatAt: value.updatedAt,
       attemptCount: 1,
+      stage: value.status === "completed" ? "completed" : "failed",
+      workerNote:
+        value.status === "completed"
+          ? "Run completed and report saved."
+          : value.errorMessage ?? "Scout run failed.",
       ...(value.errorMessage ? { lastErrorMessage: value.errorMessage } : {})
     }),
     persistence: createPersistenceMetadata({
@@ -446,7 +467,13 @@ function upgradeLegacyReportPayload(
       queuedAt: reportPayload.createdAt,
       startedAt: reportPayload.createdAt,
       finishedAt: reportPayload.createdAt,
+      heartbeatAt: reportPayload.createdAt,
       attemptCount: 1,
+      stage: (reportPayload.status ?? "completed") === "completed" ? "completed" : "failed",
+      workerNote:
+        (reportPayload.status ?? "completed") === "completed"
+          ? "Run completed and report saved."
+          : reportPayload.errorMessage ?? "Scout run failed.",
       ...(reportPayload.errorMessage ? { lastErrorMessage: reportPayload.errorMessage } : {})
     },
     persistence: {

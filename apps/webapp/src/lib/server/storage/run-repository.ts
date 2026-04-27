@@ -18,6 +18,13 @@ export interface RunRepository {
   createQueuedRun: (input: QueuedRunRecordInput) => Promise<PersistedRunRecord>;
   claimNextQueuedRun: (workerId: string) => Promise<PersistedRunRecord | null>;
   requeueStaleRuns: (staleRunMs: number) => Promise<number>;
+  updateProgress: (
+    runId: string,
+    progress: {
+      stage?: PersistedRunRecord["execution"]["stage"];
+      workerNote?: string;
+    }
+  ) => Promise<PersistedRunRecord | null>;
   save: (
     report: ScoutRunReport,
     persistence?: PersistenceMetadataInput
@@ -50,6 +57,7 @@ export function createRunRepository(): RunRepository {
     createQueuedRun: (input) => postgresRepository.createQueuedRun(input),
     claimNextQueuedRun: (workerId) => postgresRepository.claimNextQueuedRun(workerId),
     requeueStaleRuns: (staleRunMs) => postgresRepository.requeueStaleRuns(staleRunMs),
+    updateProgress: (runId, progress) => postgresRepository.updateProgress(runId, progress),
     save: (report, persistence) => postgresRepository.save(report, persistence),
     upsertRecord: (record) => postgresRepository.upsertRecord(record),
 

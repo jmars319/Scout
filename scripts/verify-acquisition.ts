@@ -10,7 +10,9 @@ import {
 } from "../packages/domain/src/index.ts";
 import {
   createPresenceRecord,
-  evaluatePresenceUrl
+  evaluatePresenceUrl,
+  isAggregatorRoundupResult,
+  isCommunityDiscussionResult
 } from "../packages/domain/src/presence.ts";
 import {
   normalizeLocationHint,
@@ -100,6 +102,28 @@ async function main(): Promise<void> {
       snippet: "Community discussion thread."
     }).type,
     "unknown"
+  );
+  assert.equal(
+    isAggregatorRoundupResult({
+      url: "https://threebestrated.com/computer-repair-in-winston-salem-nc",
+      title: "3 Best Computer Repair in Winston Salem, NC",
+      snippet: "Expert recommended Top 3 Computer Repair in Winston Salem, NC."
+    }),
+    true
+  );
+  assert.equal(
+    isAggregatorRoundupResult({
+      url: "https://thumbtack.com/nc/winston-salem/computer-repair",
+      title: "The 10 Best Computer Repair Services in Winston Salem, NC 2026 - Thumbtack",
+      snippet: "Want to see who made the cut?"
+    }),
+    true
+  );
+  assert.equal(
+    isCommunityDiscussionResult({
+      url: "https://reddit.com/r/winstonsalem/comments/1l75jbz/looking_for_donuts"
+    }),
+    true
   );
 
   const liveResults: Record<
@@ -200,6 +224,73 @@ async function main(): Promise<void> {
     )
   );
   assert(result.candidates.every((candidate) => candidate.source !== "seeded_stub"));
+
+  const aggregatorIntent = resolveMarketIntent({
+    rawQuery: "pc repair shop in Winston-Salem, NC"
+  });
+  const aggregatorResult = await acquireCandidates({
+    intent: aggregatorIntent,
+    limits: {
+      minCandidates: 2,
+      maxCandidates: 8
+    },
+    liveProviders: [
+      {
+        name: "bing_html",
+        kind: "live",
+        executeQuery: () =>
+          Promise.resolve({
+            outcome: "success",
+            candidates: [
+              {
+                title: "Welcome to Computer Repair Service - Winston-Salem, North Carolina",
+                url: "http://crs2000.net/",
+                snippet: "Established local computer repair shop.",
+                source: "bing_html"
+              },
+              {
+                title: "3 Best Computer Repair in Winston Salem, NC",
+                url: "https://threebestrated.com/computer-repair-in-winston-salem-nc",
+                snippet:
+                  "Expert recommended Top 3 Computer Repair in Winston Salem, NC. 50-Point Inspection.",
+                source: "bing_html"
+              },
+              {
+                title: "The 10 Best Computer Repair Services in Winston Salem, NC 2026 - Thumbtack",
+                url: "https://thumbtack.com/nc/winston-salem/computer-repair",
+                snippet: "Here is the definitive list. Want to see who made the cut?",
+                source: "bing_html"
+              },
+              {
+                title: "Best Computer Repair Service in Winston Salem, NC",
+                url: "https://chamberofcommerce.com/business-directory/north-carolina/winston-salem/computers-software/computer-services/computer-repair-service",
+                snippet: "Business directory category page.",
+                source: "bing_html"
+              },
+              {
+                title: "PC 到底是什么？ - 知乎",
+                url: "https://zhihu.com/question/24152546",
+                snippet: "Community discussion thread.",
+                source: "bing_html"
+              },
+              {
+                title: "Affordable PC Services - Computer Repair, Laptop Repair",
+                url: "https://affordablepcstore.com/",
+                snippet: "Offering computer repair in Winston-Salem.",
+                source: "bing_html"
+              }
+            ]
+          })
+      }
+    ]
+  });
+
+  assert.equal(aggregatorResult.diagnostics.discardedCandidateCount, 4);
+  assert.equal(aggregatorResult.candidates.length, 2);
+  assert.deepEqual(
+    aggregatorResult.candidates.map((candidate) => candidate.domain).sort(),
+    ["affordablepcstore.com", "crs2000.net"]
+  );
 
   const shortlistPresences = [
     createPresenceRecord(

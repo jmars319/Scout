@@ -2,13 +2,14 @@ import { createServer } from "node:http";
 
 import { createEmptyAcquisitionDiagnostics } from "../packages/domain/src/report.ts";
 import { resolveMarketIntent } from "../packages/domain/src/query.ts";
-import type { ScoutRunReport } from "../packages/domain/src/model.ts";
+import type { OutreachProfile, ScoutRunReport } from "../packages/domain/src/model.ts";
 
 import {
   analyzeOutreachCandidate,
   getOutreachWorkspaceState,
   saveOutreachDraftEdit
 } from "../apps/webapp/src/lib/server/outreach/outreach-service.ts";
+import { createOutreachProfileRepository } from "../apps/webapp/src/lib/server/storage/outreach-profile-repository.ts";
 import { createRunRepository } from "../apps/webapp/src/lib/server/storage/run-repository.ts";
 import { getPostgresClient } from "../apps/webapp/src/lib/server/storage/postgres-client.ts";
 
@@ -85,9 +86,50 @@ const candidate = {
   snippet: "Verification-owned website.",
   source: "verification"
 } as const;
+let originalStoredProfile: OutreachProfile | null = null;
+
+function toSaveProfileInput(profile: OutreachProfile) {
+  return {
+    senderName: profile.senderName,
+    companyName: profile.companyName,
+    roleTitle: profile.roleTitle,
+    serviceLine: profile.serviceLine,
+    serviceSummary: profile.serviceSummary,
+    defaultCallToAction: profile.defaultCallToAction,
+    contactEmail: profile.contactEmail,
+    contactPhone: profile.contactPhone,
+    websiteUrl: profile.websiteUrl,
+    schedulerUrl: profile.schedulerUrl,
+    toneNotes: profile.toneNotes,
+    avoidPhrases: profile.avoidPhrases,
+    signature: profile.signature
+  };
+}
 
 try {
   await applyScoutSchema();
+  const profileRepository = createOutreachProfileRepository();
+  originalStoredProfile = await profileRepository.getDefault();
+
+  const savedProfile = await profileRepository.saveDefault({
+    senderName: "Jordan Marshall",
+    companyName: "JAMARQ",
+    roleTitle: "Founder",
+    serviceLine: "Website repairs and conversion improvements",
+    serviceSummary: "I help small businesses fix broken website paths and make contact intent easier to act on.",
+    defaultCallToAction: "Reply if you'd like a short summary of the fixes I noticed.",
+    contactEmail: "jordan@jamarq.example",
+    contactPhone: "(336) 555-0188",
+    websiteUrl: "https://jamarq.example",
+    schedulerUrl: "https://cal.example/jamarq",
+    toneNotes: "Keep the note calm, brief, and useful.",
+    avoidPhrases: ["just checking in", "synergy"],
+    signature: "Jordan Marshall\nJAMARQ\njordan@jamarq.example"
+  });
+
+  if (savedProfile.companyName !== "JAMARQ" || savedProfile.senderName !== "Jordan Marshall") {
+    throw new Error("Scout did not persist the outreach profile.");
+  }
 
   await repository.createQueuedRun({
     runId,
@@ -281,5 +323,11 @@ try {
   const sql = getPostgresClient();
   await sql`delete from scout_outreach_drafts where run_id = ${runId}`;
   await sql`delete from scout_runs where run_id = ${runId}`;
+  const profileRepository = createOutreachProfileRepository();
+  if (originalStoredProfile) {
+    await profileRepository.saveDefault(toSaveProfileInput(originalStoredProfile));
+  } else {
+    await sql`delete from scout_outreach_profiles where profile_id = 'default'`;
+  }
   await closeScoutSchemaClient();
 }

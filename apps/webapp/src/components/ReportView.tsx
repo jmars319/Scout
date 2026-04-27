@@ -222,6 +222,10 @@ function sortFindings(findings: AuditFinding[]): AuditFinding[] {
   );
 }
 
+function buildListKey(prefix: string, index: number): string {
+  return `${prefix}-${index}`;
+}
+
 export function ReportView({
   report,
   outreach
@@ -454,8 +458,8 @@ export function ReportView({
             <div className="section-stack" style={{ marginTop: "1rem" }}>
               <div className="section-label">Acquisition Notes</div>
               <ul className="note-list">
-                {report.acquisition.notes.map((note) => (
-                  <li key={note}>{note}</li>
+                {report.acquisition.notes.map((note, index) => (
+                  <li key={buildListKey("acquisition-note", index)}>{note}</li>
                 ))}
               </ul>
             </div>
@@ -523,8 +527,10 @@ export function ReportView({
                 </div>
 
                 <ul className="note-list">
-                  {lead.reasons.map((reason) => (
-                    <li key={reason}>{reason}</li>
+                  {lead.reasons.map((reason, index) => (
+                    <li key={buildListKey(`shortlist-reason-${lead.candidateId}`, index)}>
+                      {reason}
+                    </li>
                   ))}
                 </ul>
               </li>
@@ -616,8 +622,10 @@ export function ReportView({
                     <div className="section-label">Reviewed Pages</div>
                     <ul className="note-list">
                       <li>Homepage: {business.primaryUrl}</li>
-                      {business.secondaryUrls.map((url) => (
-                        <li key={url}>Secondary: {url}</li>
+                      {business.secondaryUrls.map((url, index) => (
+                        <li key={buildListKey(`secondary-url-${business.candidateId}`, index)}>
+                          Secondary: {url}
+                        </li>
                       ))}
                     </ul>
                   </div>
@@ -629,8 +637,10 @@ export function ReportView({
                       {business.auditStatus === "audited" ? "Detection Notes" : "Skipped Notes"}
                     </div>
                     <ul className="note-list">
-                      {business.detectionNotes.map((note) => (
-                        <li key={note}>{note}</li>
+                      {business.detectionNotes.map((note, index) => (
+                        <li key={buildListKey(`detection-note-${business.candidateId}`, index)}>
+                          {note}
+                        </li>
                       ))}
                     </ul>
                   </div>
@@ -715,8 +725,8 @@ export function ReportView({
       {report.notes.length > 0 ? (
         <Panel title="Run Notes">
           <ul className="note-list">
-            {report.notes.map((note) => (
-              <li key={note}>{note}</li>
+            {report.notes.map((note, index) => (
+              <li key={buildListKey("run-note", index)}>{note}</li>
             ))}
           </ul>
         </Panel>

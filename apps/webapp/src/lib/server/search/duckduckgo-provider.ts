@@ -287,14 +287,15 @@ export function createDuckDuckGoHtmlProvider(options?: {
   return {
     name: "duckduckgo_html",
     kind: "live",
-    async executeQuery(query, limit) {
+    async executeQuery(query, limit, onProgress) {
       if (browserBackedMode && interactiveSession) {
         return interactiveSession.search({
           providerName: "DuckDuckGo HTML",
           query,
           limit,
           searchUrl: buildSearchUrl(query),
-          parsePage: parseDuckDuckGoHtmlSearchPage
+          parsePage: parseDuckDuckGoHtmlSearchPage,
+          ...(onProgress ? { onProgress } : {})
         });
       }
 
@@ -321,12 +322,16 @@ export function createDuckDuckGoHtmlProvider(options?: {
         return parsed;
       }
 
+      await onProgress?.(
+        "DuckDuckGo requested human confirmation in a browser window. Complete it there to continue."
+      );
       const browserResponse = await interactiveSession.search({
         providerName: "DuckDuckGo HTML",
         query,
         limit,
         searchUrl: buildSearchUrl(query),
-        parsePage: parseDuckDuckGoHtmlSearchPage
+        parsePage: parseDuckDuckGoHtmlSearchPage,
+        ...(onProgress ? { onProgress } : {})
       });
 
       if (browserResponse.outcome === "success" || browserResponse.outcome === "empty") {

@@ -16,6 +16,7 @@ import {
 } from "../storage/outreach-draft-repository.ts";
 import { analyzeContactStrategy } from "./contact-strategy.ts";
 import { buildOutreachTargetContext } from "./grounding.ts";
+import { getOutreachProfile } from "../settings/outreach-profile-service.ts";
 
 const generatedDraftSchema = z.object({
   subjectLine: z.string().trim().min(1).max(180),
@@ -88,11 +89,26 @@ function buildPromptPayload(
   report: ScoutRunReport,
   target: ReturnType<typeof buildOutreachTargetContext>,
   strategy: ContactStrategyState,
+  profile: Awaited<ReturnType<typeof getOutreachProfile>>,
   tone: OutreachTone,
   length: OutreachLength
 ) {
   return {
-    sender: "JAMARQ",
+    senderProfile: {
+      senderName: profile.senderName,
+      companyName: profile.companyName,
+      roleTitle: profile.roleTitle,
+      serviceLine: profile.serviceLine,
+      serviceSummary: profile.serviceSummary,
+      defaultCallToAction: profile.defaultCallToAction,
+      contactEmail: profile.contactEmail,
+      contactPhone: profile.contactPhone,
+      websiteUrl: profile.websiteUrl,
+      schedulerUrl: profile.schedulerUrl,
+      toneNotes: profile.toneNotes,
+      avoidPhrases: profile.avoidPhrases,
+      signature: profile.signature
+    },
     businessName: target.businessName,
     primaryUrl: target.primaryUrl,
     presenceType: target.business.presenceType,
@@ -127,10 +143,17 @@ function buildPromptPayload(
   };
 }
 
-function buildSystemPrompt(tone: OutreachTone, length: OutreachLength): string {
-  return [
-    "You write restrained outreach drafts for JAMARQ.",
+function buildSystemPrompt(
+  tone: OutreachTone,
+  length: OutreachLength,
+  profile: Awaited<ReturnType<typeof getOutreachProfile>>
+): string {
+  const lines = [
+    `You write restrained outreach drafts for ${profile.companyName || "JAMARQ"}.`,
     "Use only the evidence provided in the JSON input.",
+    "Use the senderProfile object as the source of truth for who is reaching out, what they offer, and what next step they prefer.",
+    "Use senderProfile.defaultCallToAction when a concrete next step is helpful, but omit it if the field is blank.",
+    "If senderProfile fields are blank, omit them instead of inventing details.",
     "Do not invent page details, metrics, business context, pricing, or results not present in the input.",
     "Do not mention Scout, AI, automation, scraping, search providers, screenshots, or audits directly.",
     "If the evidence is weak or not confirmed, use softer language like 'may', 'might', or 'could'.",
@@ -142,7 +165,17 @@ function buildSystemPrompt(tone: OutreachTone, length: OutreachLength): string {
     "If phone is a viable channel, include phoneTalkingPoints with opener, keyPoints, and close. Otherwise return null for phoneTalkingPoints.",
     resolveToneGuidance(tone),
     resolveLengthGuidance(length)
-  ].join(" ");
+  ];
+
+  if (profile.toneNotes) {
+    lines.push(`Additional sender tone guidance: ${profile.toneNotes}`);
+  }
+
+  if (profile.avoidPhrases.length > 0) {
+    lines.push(`Never use these phrases: ${profile.avoidPhrases.join("; ")}`);
+  }
+
+  return lines.join(" ");
 }
 
 function extractResponseText(payload: unknown): string {
@@ -203,6 +236,7 @@ async function requestGeneratedDraft(
   }
 
   const target = buildOutreachTargetContext(report, candidateId);
+  const profile = await getOutreachProfile();
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
@@ -214,7 +248,7 @@ async function requestGeneratedDraft(
       input: [
         {
           role: "system",
-          content: [{ type: "input_text", text: buildSystemPrompt(tone, length) }]
+          content: [{ type: "input_text", text: buildSystemPrompt(tone, length, profile) }]
         },
         {
           role: "user",
@@ -222,7 +256,7 @@ async function requestGeneratedDraft(
             {
               type: "input_text",
               text: `Return only JSON.\n${JSON.stringify(
-                buildPromptPayload(report, target, strategy, tone, length),
+                buildPromptPayload(report, target, strategy, profile, tone, length),
                 null,
                 2
               )}`

@@ -2,6 +2,7 @@ import type {
   PresenceAuditResult,
   PresenceRecord,
   ResolvedMarketIntent,
+  RunExecutionStage,
   ScoutAcquisitionResult,
   ScoutQueryInput,
   ScoutRunReport,
@@ -18,6 +19,10 @@ export interface RunScoutDependencies {
     presence: PresenceRecord,
     intent: ResolvedMarketIntent
   ) => Promise<PresenceAuditResult>;
+  onProgress?: (update: {
+    stage: RunExecutionStage;
+    workerNote: string;
+  }) => Promise<void> | void;
   now?: () => Date;
   generateRunId?: () => string;
   onCompleted?: (report: ScoutRunReport) => Promise<void> | void;

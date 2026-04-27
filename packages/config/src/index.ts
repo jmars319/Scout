@@ -135,12 +135,12 @@ export function getInteractiveSearchConfig(
   source: Record<string, string | undefined> = process.env
 ): InteractiveSearchConfig {
   const enabledValue = source.SCOUT_INTERACTIVE_SEARCH?.trim().toLowerCase();
-  const timeoutMs = Number(source.SCOUT_INTERACTIVE_SEARCH_TIMEOUT_MS ?? 180_000);
+  const timeoutMs = Number(source.SCOUT_INTERACTIVE_SEARCH_TIMEOUT_MS ?? 420_000);
   const profileDir = source.SCOUT_INTERACTIVE_SEARCH_PROFILE_DIR?.trim();
 
   return {
     enabled: enabledValue === "1" || enabledValue === "true" || enabledValue === "yes",
-    timeoutMs: Number.isFinite(timeoutMs) && timeoutMs >= 30_000 ? timeoutMs : 180_000,
+    timeoutMs: Number.isFinite(timeoutMs) && timeoutMs >= 30_000 ? timeoutMs : 420_000,
     ...(profileDir ? { profileDir } : {})
   };
 }

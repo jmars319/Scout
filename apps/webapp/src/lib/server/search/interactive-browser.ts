@@ -8,6 +8,7 @@ import type { ProviderSearchResponse } from "./provider-types.ts";
 
 const NAVIGATION_TIMEOUT_MS = 30_000;
 const POLL_INTERVAL_MS = 1_000;
+const INTERACTIVE_CONTENT_TIMEOUT_MS = 4_000;
 
 interface InteractiveBrowserSearchInput {
   providerName: string;
@@ -15,6 +16,7 @@ interface InteractiveBrowserSearchInput {
   limit: number;
   searchUrl: string;
   parsePage: (html: string, limit: number) => ProviderSearchResponse;
+  onProgress?: (workerNote: string) => Promise<void> | void;
 }
 
 export interface InteractiveBrowserSearchSession {
@@ -58,6 +60,52 @@ function describeNavigationFailure(providerName: string, error: unknown): Provid
     candidates: [],
     detail: `${providerName} browser session could not load the search page.`
   };
+}
+
+function describeContentReadFailure(providerName: string, error: unknown): ProviderSearchResponse {
+  if (error instanceof Error) {
+    return {
+      outcome: "parse_error",
+      candidates: [],
+      detail: `${providerName} browser session could not read the current page: ${error.message}`
+    };
+  }
+
+  return {
+    outcome: "parse_error",
+    candidates: [],
+    detail: `${providerName} browser session could not read the current page.`
+  };
+}
+
+function isTransientPageReadError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const message = error.message.toLowerCase();
+
+  return (
+    message.includes("page is navigating and changing the content") ||
+    message.includes("execution context was destroyed") ||
+    message.includes("most likely because of a navigation")
+  );
+}
+
+async function readCurrentPageHtml(page: Page): Promise<string | null> {
+  await page
+    .waitForLoadState("domcontentloaded", { timeout: INTERACTIVE_CONTENT_TIMEOUT_MS })
+    .catch(() => {});
+
+  try {
+    return await page.content();
+  } catch (error) {
+    if (isTransientPageReadError(error)) {
+      return null;
+    }
+
+    throw error;
+  }
 }
 
 export function createInteractiveBrowserSearchSession(
@@ -105,9 +153,39 @@ export function createInteractiveBrowserSearchSession(
         const deadline = Date.now() + config.timeoutMs;
         let manualConfirmationNeeded = false;
         let lastResponse: ProviderSearchResponse | null = null;
+        let lastProgressNote = "";
+        let lastProgressAt = 0;
+
+        const publishProgress = async (workerNote: string) => {
+          const now = Date.now();
+          if (workerNote === lastProgressNote && now - lastProgressAt < 4_000) {
+            return;
+          }
+
+          lastProgressNote = workerNote;
+          lastProgressAt = now;
+          await input.onProgress?.(workerNote);
+        };
 
         while (Date.now() < deadline) {
-          const html = await page.content();
+          let html: string | null;
+
+          try {
+            html = await readCurrentPageHtml(page);
+          } catch (error) {
+            return describeContentReadFailure(input.providerName, error);
+          }
+
+          if (!html) {
+            await publishProgress(
+              manualConfirmationNeeded
+                ? `Waiting for ${input.providerName} human confirmation in the browser window.`
+                : `Waiting for ${input.providerName} browser-backed results to settle.`
+            );
+            await page.waitForTimeout(POLL_INTERVAL_MS);
+            continue;
+          }
+
           const response = input.parsePage(html, input.limit);
           lastResponse = response;
 
@@ -133,6 +211,13 @@ export function createInteractiveBrowserSearchSession(
 
           if (response.outcome === "blocked") {
             manualConfirmationNeeded = true;
+            await publishProgress(
+              `Waiting for ${input.providerName} human confirmation in the browser window.`
+            );
+          } else if (response.outcome === "parse_error") {
+            await publishProgress(
+              `Waiting for ${input.providerName} browser-backed results to settle.`
+            );
           }
 
           await page.waitForTimeout(POLL_INTERVAL_MS);

@@ -1,6 +1,10 @@
 import { chromium } from "playwright";
 
-import { runScout, type ScoutRunReport } from "@scout/domain";
+import {
+  runScout,
+  type RunExecutionStage,
+  type ScoutRunReport
+} from "@scout/domain";
 
 import { createPlaywrightAuditor } from "../audit/playwright-auditor.ts";
 import { buildFailedReport } from "../report/failed-report.ts";
@@ -13,7 +17,11 @@ import {
 } from "../storage/persisted-run-record.ts";
 
 export async function executeScoutRunRecord(
-  record: Pick<PersistedRunRecord, "runId" | "createdAt" | "input" | "intent">
+  record: Pick<PersistedRunRecord, "runId" | "createdAt" | "input" | "intent">,
+  onProgress?: (update: {
+    stage: RunExecutionStage;
+    workerNote: string;
+  }) => Promise<void>
 ): Promise<ScoutRunReport> {
   const createdAt = new Date(record.createdAt);
   const evidenceStorage = createEvidenceStorage();
@@ -21,6 +29,10 @@ export async function executeScoutRunRecord(
   const browser = await chromium.launch({ headless: true });
 
   try {
+    await onProgress?.({
+      stage: "starting",
+      workerNote: "Preparing Scout browser and storage dependencies."
+    });
     const auditor = createPlaywrightAuditor({
       browser,
       evidenceStorage,
@@ -30,9 +42,16 @@ export async function executeScoutRunRecord(
     try {
       return await runScout(record.input, {
         resolveIntent: () => normalizePersistedIntent(record.intent),
-        searchCandidates: (intent) => searchProvider.search(intent),
+        searchCandidates: (intent) =>
+          searchProvider.search(intent, (workerNote) =>
+            onProgress?.({
+              stage: "acquiring_candidates",
+              workerNote
+            })
+          ),
         detectPresence,
         auditPresence: (presence, intent) => auditor.auditPresence(presence, intent),
+        ...(onProgress ? { onProgress } : {}),
         now: () => createdAt,
         generateRunId: () => record.runId
       });

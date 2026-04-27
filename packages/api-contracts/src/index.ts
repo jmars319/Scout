@@ -1,5 +1,6 @@
 import {
   outreachDraftSchema,
+  outreachProfileSchema,
   scoutQueryInputSchema,
   scoutRunReportSchema
 } from "@scout/validation";
@@ -65,6 +66,16 @@ export const outreachDraftResponseSchema = z.object({
   errorMessage: z.string().optional()
 });
 
+export const updateOutreachProfileRequestSchema = outreachProfileSchema.omit({
+  profileId: true,
+  updatedAt: true
+});
+
+export const outreachProfileResponseSchema = z.object({
+  profile: outreachProfileSchema.optional(),
+  errorMessage: z.string().optional()
+});
+
 export type CreateScoutRunRequest = z.infer<typeof createScoutRunRequestSchema>;
 export type CreateScoutRunResponse = z.infer<typeof createScoutRunResponseSchema>;
 export type GetScoutRunResponse = z.infer<typeof getScoutRunResponseSchema>;
@@ -72,3 +83,5 @@ export type CreateOutreachDraftRequest = z.infer<typeof createOutreachDraftReque
 export type UpdateOutreachDraftRequest = z.infer<typeof updateOutreachDraftRequestSchema>;
 export type ListOutreachDraftsResponse = z.infer<typeof listOutreachDraftsResponseSchema>;
 export type OutreachDraftResponse = z.infer<typeof outreachDraftResponseSchema>;
+export type UpdateOutreachProfileRequest = z.infer<typeof updateOutreachProfileRequestSchema>;
+export type OutreachProfileResponse = z.infer<typeof outreachProfileResponseSchema>;

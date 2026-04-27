@@ -10,7 +10,10 @@ import type { SearchProviderAdapter } from "./provider-types.ts";
 import { createSeededFallbackProvider } from "./seeded-provider.ts";
 
 export interface SearchProvider {
-  search: (intent: ResolvedMarketIntent) => Promise<ScoutAcquisitionResult>;
+  search: (
+    intent: ResolvedMarketIntent,
+    onProgress?: (workerNote: string) => Promise<void> | void
+  ) => Promise<ScoutAcquisitionResult>;
   dispose?: () => Promise<void>;
 }
 
@@ -112,21 +115,14 @@ function resolveLiveProviders(
   }
 
   if (configuredProvider === "google_html") {
-    return [
-      createGoogleHtmlProvider({
-        interactiveSession
-      }),
-      createBingHtmlProvider()
-    ];
+    return [createGoogleHtmlProvider(), createBingHtmlProvider()];
   }
 
   return [
     createDuckDuckGoHtmlProvider({
       interactiveSession
     }),
-    createGoogleHtmlProvider({
-      interactiveSession
-    }),
+    createGoogleHtmlProvider(),
     createBingHtmlProvider()
   ];
 }
@@ -150,7 +146,7 @@ export function createSearchProvider(): SearchProvider {
   }
 
   return {
-    async search(intent) {
+    async search(intent, onProgress) {
       const result =
         configuredProvider === "seeded_stub"
           ? await acquireCandidates({
@@ -158,12 +154,14 @@ export function createSearchProvider(): SearchProvider {
               limits,
               liveProviders: [],
               useFallbackOnly: true,
-              fallbackProvider: createSeededFallbackProvider(intent)
+              fallbackProvider: createSeededFallbackProvider(intent),
+              ...(onProgress ? { onProgress } : {})
             })
           : await acquireCandidates({
               intent,
               limits,
-              liveProviders
+              liveProviders,
+              ...(onProgress ? { onProgress } : {})
             });
 
       if (result.candidates.length === 0) {

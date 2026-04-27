@@ -152,6 +152,59 @@ summary {
   gap: 0.75rem;
 }
 
+.app-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--surface-strong) 92%, transparent);
+  box-shadow: var(--panel-shadow);
+  backdrop-filter: blur(18px);
+}
+
+.app-nav-cluster,
+.app-nav-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.app-nav-meta {
+  color: var(--muted);
+  min-width: 0;
+}
+
+.app-nav-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.5rem;
+  padding: 0.55rem 0.95rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.app-nav-link.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 32%, var(--line));
+}
+
+.app-nav-link-accent {
+  background: var(--button-bg);
+  color: var(--button-ink);
+  border-color: transparent;
+}
+
 .run-form {
   display: grid;
   gap: 0.9rem;
@@ -426,6 +479,108 @@ summary {
   gap: 1rem;
 }
 
+.outreach-card {
+  gap: 0;
+}
+
+.outreach-card.expanded {
+  border-color: color-mix(in srgb, var(--accent) 26%, var(--line));
+  box-shadow: 0 18px 42px rgba(2, 6, 23, 0.18);
+}
+
+.outreach-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.outreach-card-main {
+  display: grid;
+  gap: 0.3rem;
+  min-width: 0;
+  flex: 1 1 26rem;
+}
+
+.outreach-card-summary {
+  line-height: 1.6;
+}
+
+.outreach-card-side {
+  display: grid;
+  gap: 0.7rem;
+  justify-items: end;
+  min-width: 0;
+}
+
+.outreach-card-toggle {
+  min-width: 8rem;
+}
+
+.outreach-card-body {
+  display: grid;
+  gap: 1rem;
+  border-top: 1px solid var(--line);
+  margin-top: 1rem;
+  padding-top: 1rem;
+}
+
+.progress-track {
+  display: grid;
+  gap: 0.8rem;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.progress-step {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 0.9rem 1rem;
+  background: var(--surface);
+}
+
+.progress-step-head {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-bottom: 0.5rem;
+}
+
+.progress-dot {
+  width: 0.72rem;
+  height: 0.72rem;
+  border-radius: 999px;
+  background: var(--muted);
+  flex: 0 0 auto;
+}
+
+.progress-step.completed {
+  border-color: color-mix(in srgb, var(--tone-good-ink) 30%, var(--line));
+  background: color-mix(in srgb, var(--tone-good-bg) 70%, var(--surface));
+}
+
+.progress-step.completed .progress-dot {
+  background: var(--tone-good-ink);
+}
+
+.progress-step.active {
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--line));
+  background: color-mix(in srgb, var(--accent-soft) 72%, var(--surface));
+}
+
+.progress-step.active .progress-dot {
+  background: var(--accent);
+}
+
+.progress-step.failed {
+  border-color: color-mix(in srgb, var(--tone-danger-ink) 34%, var(--line));
+  background: color-mix(in srgb, var(--tone-danger-bg) 70%, var(--surface));
+}
+
+.progress-step.failed .progress-dot {
+  background: var(--tone-danger-ink);
+}
+
 .outreach-banner {
   display: flex;
   justify-content: space-between;
@@ -574,6 +729,7 @@ html[data-theme="light"] .theme-toggle-thumb {
 .secondary-button:focus-visible,
 .example-list button:focus-visible,
 .pill-button:focus-visible,
+.app-nav-link:focus-visible,
 .run-form input:focus-visible,
 .draft-input:focus-visible,
 .draft-textarea:focus-visible,
@@ -598,12 +754,25 @@ summary:focus-visible {
 
   .header-actions,
   .theme-toggle-shell,
-  .theme-toggle {
+  .theme-toggle,
+  .app-nav,
+  .app-nav-cluster,
+  .app-nav-meta {
     width: 100%;
   }
 
   .header-actions {
     justify-content: stretch;
+  }
+
+  .app-nav,
+  .app-nav-cluster,
+  .app-nav-meta {
+    justify-content: stretch;
+  }
+
+  .app-nav-link {
+    flex: 1 1 0;
   }
 
   .theme-toggle {
@@ -612,6 +781,15 @@ summary:focus-visible {
 
   .outreach-banner {
     flex-direction: column;
+  }
+
+  .outreach-card-side,
+  .outreach-card-toggle {
+    width: 100%;
+  }
+
+  .outreach-card-side {
+    justify-items: stretch;
   }
 
   .finding-table,
