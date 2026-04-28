@@ -6,6 +6,7 @@ out
 dist
 coverage
 apps/desktopapp/.desktop-runtime
+apps/desktopapp/build/
 .env
 .env.*
 !.env.example

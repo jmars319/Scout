@@ -11,6 +11,7 @@ const runtimeDir = path.resolve(desktopDir, ".desktop-runtime");
 const webRuntimeStagingDir = path.resolve(runtimeDir, ".webapp-staging");
 const webRuntimeDir = path.resolve(runtimeDir, "webapp");
 const browserRuntimeDir = path.resolve(runtimeDir, "playwright");
+const hashedPlaywrightPackageName = "playwright-f3e876efb1eb8da1";
 const pnpmBin = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
 
 function run(command, args, env = process.env) {
@@ -83,6 +84,30 @@ async function bundleWorkerRuntime() {
   });
 }
 
+async function ensureTurbopackExternalAliases() {
+  const packageDir = path.resolve(webRuntimeDir, "node_modules", hashedPlaywrightPackageName);
+  await mkdir(packageDir, {
+    recursive: true
+  });
+
+  await writeFile(
+    path.resolve(packageDir, "package.json"),
+    `${JSON.stringify(
+      {
+        name: hashedPlaywrightPackageName,
+        private: true,
+        main: "index.js"
+      },
+      null,
+      2
+    )}\n`
+  );
+  await writeFile(
+    path.resolve(packageDir, "index.js"),
+    'module.exports = require("playwright");\n'
+  );
+}
+
 async function writeRuntimeManifest() {
   await writeFile(
     path.resolve(runtimeDir, "manifest.json"),
@@ -118,6 +143,7 @@ console.log("Deploying a self-contained webapp runtime...");
 await run(pnpmBin, ["--filter", "@scout/webapp", "deploy", "--legacy", "--prod", webRuntimeStagingDir]);
 await rename(webRuntimeStagingDir, webRuntimeDir);
 await trimDeployedWebRuntime();
+await ensureTurbopackExternalAliases();
 
 console.log("Bundling the packaged worker runtime...");
 await bundleWorkerRuntime();

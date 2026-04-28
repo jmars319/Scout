@@ -23,6 +23,8 @@
 `pnpm run dev:all` starts the web app and worker together in one local shell session.
 `pnpm run dev:desktop` starts a local web server plus worker automatically, then opens the same Scout flow inside Electron.
 `pnpm run package:desktop` builds a macOS desktop release under `dist/desktop`.
+`pnpm run install:desktop` packages Scout, installs `Scout by JAMARQ.app` into `~/Applications`, seeds the packaged desktop `.env` file if needed, and opens the installed app.
+`pnpm run launch:desktop` opens the installed Scout app from `~/Applications` or falls back to the packaged build under `dist/desktop`.
 `pnpm run clean:local` prunes the desktop interactive-search browser caches without clearing the saved session.
 `pnpm run clean:local:full` removes the local interactive-search profile and local screenshot evidence without touching Postgres.
 
@@ -173,6 +175,10 @@ Desktop startup also prunes cache-heavy folders inside that profile at most once
   a deployed webapp runtime with its own `node_modules`
   a bundled worker entrypoint
   the Playwright Chromium binaries used by Scout audits
+- `pnpm run install:desktop`
+  Packages Scout, copies `Scout by JAMARQ.app` into `~/Applications`, seeds the packaged desktop env file, and opens the installed app.
+- `pnpm run launch:desktop`
+  Opens the installed app from `~/Applications` without rebuilding it.
 - `pnpm run dev:mobile`
   Mobile remains scaffold-only in v1 and currently prints a stable message.
 
@@ -181,8 +187,10 @@ Desktop stays intentionally thin. It does not introduce a second product workflo
 ## Packaged Desktop Env
 
 - The packaged app still requires `DATABASE_URL`.
-- If you launch it from Finder, place a `.env` file at:
+- On first packaged launch, Scout now auto-creates:
   `~/Library/Application Support/Scout by JAMARQ/.env`
+  with `DATABASE_URL=postgresql:///scout` as the local default.
+- You can edit that file later if you need a different Postgres target or want to add `OPENAI_API_KEY`.
 - The packaged app also checks:
   `Scout.app/Contents/Resources/scout.env`
 - `EVIDENCE_LOCAL_DIR` is set automatically for the packaged app to a user-data evidence folder, so screenshot storage stays outside the app bundle.

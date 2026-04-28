@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { createRequire } from "node:module";
@@ -12,6 +13,7 @@ import {
   stopManagedProcess,
   waitForServerReady
 } from "./lib/runtime.mjs";
+import { ensurePackagedUserEnvFile } from "./lib/launcher.mjs";
 import {
   getPackagedDesktopLocalState,
   maybeAutoCleanupInteractiveSearch
@@ -52,6 +54,24 @@ async function readRuntimeManifest() {
   };
 }
 
+function getPackagedNodeHostPath() {
+  const helperExecutablePath = path.resolve(
+    path.dirname(process.execPath),
+    "..",
+    "Frameworks",
+    `${appName} Helper.app`,
+    "Contents",
+    "MacOS",
+    `${appName} Helper`
+  );
+
+  if (existsSync(helperExecutablePath)) {
+    return helperExecutablePath;
+  }
+
+  return process.execPath;
+}
+
 async function shutdownRuntime() {
   if (shuttingDown) {
     return;
@@ -65,6 +85,10 @@ async function shutdownRuntime() {
 async function startPackagedRuntime() {
   const userDataDir = app.getPath("userData");
   const localState = getPackagedDesktopLocalState(userDataDir);
+  await ensurePackagedUserEnvFile({
+    name: appName,
+    userDataDirPath: userDataDir
+  });
   loadEnvFiles([
     path.resolve(process.resourcesPath, "scout.env"),
     path.resolve(userDataDir, ".env")
@@ -82,6 +106,7 @@ async function startPackagedRuntime() {
   const port = await getAvailablePort();
   const baseUrl = `http://127.0.0.1:${port}`;
   const manifest = await readRuntimeManifest();
+  const nodeHostPath = getPackagedNodeHostPath();
   const cleanupResult = await maybeAutoCleanupInteractiveSearch({
     profileDir: localState.profileDir,
     cleanupStateFilePath: localState.cleanupStateFilePath,
@@ -111,7 +136,7 @@ async function startPackagedRuntime() {
 
   const webProcess = createManagedProcess(
     "web",
-    process.execPath,
+    nodeHostPath,
     [
       "--no-warnings",
       manifest.nextCliPath,
@@ -131,7 +156,7 @@ async function startPackagedRuntime() {
   );
   const workerProcess = createManagedProcess(
     "worker",
-    process.execPath,
+    nodeHostPath,
     ["--no-warnings", manifest.workerEntryPath],
     {
       ...nodeEnv,

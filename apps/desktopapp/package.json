@@ -10,8 +10,11 @@
     "dev": "node ./scripts/dev.mjs",
     "start": "node ./scripts/start.mjs",
     "build": "tsc -p tsconfig.json --noEmit",
+    "build:icon": "node ./scripts/build-icon.mjs",
     "prepare:runtime": "node ./scripts/prepare-runtime.mjs",
-    "dist:mac": "pnpm run prepare:runtime && electron-builder --mac dir dmg zip --publish never",
+    "dist:mac": "pnpm run build:icon && pnpm run prepare:runtime && electron-builder --mac dir dmg zip --publish never",
+    "install:mac": "pnpm run dist:mac && node ./scripts/install-macos.mjs",
+    "launch:mac": "node ./scripts/launch-macos.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "verify": "pnpm run build && node ./scripts/verify.mjs"
   },
@@ -28,7 +31,8 @@
     "productName": "Scout by JAMARQ",
     "artifactName": "Scout-${version}-${arch}.${ext}",
     "directories": {
-      "output": "../../dist/desktop"
+      "output": "../../dist/desktop",
+      "buildResources": "build"
     },
     "files": [
       "package.json",
@@ -45,12 +49,16 @@
     ],
     "asar": true,
     "mac": {
+      "icon": "icon.icns",
       "category": "public.app-category.business",
       "target": [
         "dir",
         "dmg",
         "zip"
       ]
+    },
+    "dmg": {
+      "icon": "icon.icns"
     }
   }
 }

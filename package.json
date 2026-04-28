@@ -19,6 +19,8 @@
     "dev:all": "node ./scripts/dev-all.mjs",
     "dev:desktop": "pnpm --filter @scout/desktopapp dev",
     "start:desktop": "pnpm --filter @scout/desktopapp start",
+    "launch:desktop": "pnpm --filter @scout/desktopapp run launch:mac",
+    "install:desktop": "pnpm --filter @scout/desktopapp run install:mac",
     "dev:mobile": "pnpm --filter @scout/mobileapp dev",
     "dev:both": "node ./scripts/dev-both.mjs",
     "worker:start": "pnpm --filter @scout/webapp run worker",

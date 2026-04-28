@@ -60,6 +60,8 @@ scout/
 - `pnpm run dev:all`
 - `pnpm run dev:desktop`
 - `pnpm run start:desktop`
+- `pnpm run launch:desktop`
+- `pnpm run install:desktop`
 - `pnpm run dev:mobile`
 - `pnpm run dev:both`
 - `pnpm run worker:start`
@@ -104,6 +106,10 @@ scout/
   Confirms the desktop package typechecks and that Electron can launch Scout's desktop runtime entrypoint.
 - `pnpm run package:desktop`
   Builds a macOS desktop release under `dist/desktop`, including an unpacked `.app`, a `.zip`, and a `.dmg`.
+- `pnpm run install:desktop`
+  Builds the packaged macOS app, installs it into `~/Applications/Scout by JAMARQ.app`, seeds `~/Library/Application Support/Scout by JAMARQ/.env` if needed, and opens Scout like a normal Mac app.
+- `pnpm run launch:desktop`
+  Opens the installed Scout app from `~/Applications` when present, otherwise falls back to the packaged build under `dist/desktop`.
 - Desktop startup automatically prunes cache-heavy folders inside the interactive-search Chromium profile at most once per 24 hours. That keeps `.local` from growing indefinitely without throwing away the session state that helps DuckDuckGo and Google confirmation windows stay useful.
 - `pnpm run clean:local`
   Prunes only the interactive-search browser caches under repo `.local`.
@@ -114,7 +120,8 @@ scout/
 - Completed report views now include a local outreach workspace for shortlist targets. Scout can inspect contact paths, recommend the best first channel, generate email plus short-form plus phone-ready copy, and save everything locally, but it still does not send outreach automatically.
 - The packaged macOS app runs its own bundled `next start` server, bundled worker runtime, and bundled Chromium for audits.
 - Desktop mode enables manual in-browser confirmation only for DuckDuckGo. If DuckDuckGo serves a human-check page, Scout can open a local browser-backed search window and continue after the operator clears it. Google is treated as fetch-only and simply degrades if it serves a challenge flow.
-- The packaged app still needs `DATABASE_URL`. When launched outside a shell, it reads env from `~/Library/Application Support/Scout by JAMARQ/.env` or from `Scout.app/Contents/Resources/scout.env` if you place one there before launch.
+- The packaged app still needs `DATABASE_URL`, but Scout now auto-creates `~/Library/Application Support/Scout by JAMARQ/.env` on first packaged launch with `DATABASE_URL=postgresql:///scout` as the local default.
+- If you prefer a one-step local install instead of opening bundles from `dist/desktop`, use `pnpm run install:desktop` once and then launch Scout from Spotlight, Launchpad, Finder, or the Dock like a normal Mac app.
 
 ## Live Acquisition
 
