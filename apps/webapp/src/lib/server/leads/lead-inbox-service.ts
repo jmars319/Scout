@@ -6,6 +6,7 @@ import type {
 } from "@scout/domain";
 
 import { createLeadAnnotationRepository } from "../storage/lead-annotation-repository.ts";
+import type { LeadAnnotationRunRecord } from "../storage/lead-annotation-repository.ts";
 import { createOutreachDraftRepository } from "../storage/outreach-draft-repository.ts";
 
 export type LeadInboxFilter = "all" | "open" | "saved" | "contacted" | "closed" | "due";
@@ -176,12 +177,10 @@ export function filterLeadInboxItems(
   return items.filter((item) => matchesFilter(item, filter, today) && matchesSearch(item, search));
 }
 
-export async function listLeadInboxItems(limit = 200): Promise<LeadInboxItem[]> {
-  const repository = createLeadAnnotationRepository();
-  const records = await repository.listWithRunContext(limit);
-  const drafts = await createOutreachDraftRepository().listByRunIds(
-    records.map((record) => record.run.runId)
-  );
+function buildLeadInboxItems(
+  records: LeadAnnotationRunRecord[],
+  drafts: OutreachDraft[]
+): LeadInboxItem[] {
   const draftByLead = new Map(drafts.map((draft) => [`${draft.runId}:${draft.candidateId}`, draft]));
 
   return records.map((record) => {
@@ -229,4 +228,29 @@ export async function listLeadInboxItems(limit = 200): Promise<LeadInboxItem[]> 
       annotation: record.annotation
     };
   });
+}
+
+export async function listLeadInboxItems(limit = 200): Promise<LeadInboxItem[]> {
+  const repository = createLeadAnnotationRepository();
+  const records = await repository.listWithRunContext(limit);
+  const drafts = await createOutreachDraftRepository().listByRunIds(
+    records.map((record) => record.run.runId)
+  );
+
+  return buildLeadInboxItems(records, drafts);
+}
+
+export async function getLeadInboxItem(
+  runId: string,
+  candidateId: string
+): Promise<LeadInboxItem | null> {
+  const record = await createLeadAnnotationRepository().getWithRunContext(runId, candidateId);
+
+  if (!record) {
+    return null;
+  }
+
+  const draft = await createOutreachDraftRepository().get(runId, candidateId);
+
+  return buildLeadInboxItems([record], draft ? [draft] : [])[0] ?? null;
 }

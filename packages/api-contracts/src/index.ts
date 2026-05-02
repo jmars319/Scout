@@ -54,6 +54,28 @@ export const listLeadInboxResponseSchema = z.object({
   errorMessage: z.string().optional()
 });
 
+export const leadInboxItemResponseSchema = z.object({
+  item: leadInboxItemSchema.optional(),
+  errorMessage: z.string().optional()
+});
+
+export const leadInboxActionRequestSchema = z.discriminatedUnion("action", [
+  z.object({
+    action: z.literal("analyze_contact")
+  }),
+  z.object({
+    action: z.literal("generate_draft"),
+    tone: z.enum(outreachTones).optional(),
+    length: z.enum(outreachLengths).optional()
+  }),
+  z.object({
+    action: z.literal("mark_contacted"),
+    followUpDate: z
+      .union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/), z.null()])
+      .optional()
+  })
+]);
+
 export const createOutreachDraftRequestSchema = z.object({
   candidateId: z.string(),
   tone: z.enum(outreachTones).optional(),
@@ -112,6 +134,8 @@ export type UpdateLeadAnnotationRequest = z.infer<typeof updateLeadAnnotationReq
 export type ListLeadAnnotationsResponse = z.infer<typeof listLeadAnnotationsResponseSchema>;
 export type LeadAnnotationResponse = z.infer<typeof leadAnnotationResponseSchema>;
 export type ListLeadInboxResponse = z.infer<typeof listLeadInboxResponseSchema>;
+export type LeadInboxItemResponse = z.infer<typeof leadInboxItemResponseSchema>;
+export type LeadInboxActionRequest = z.infer<typeof leadInboxActionRequestSchema>;
 export type CreateOutreachDraftRequest = z.infer<typeof createOutreachDraftRequestSchema>;
 export type UpdateOutreachDraftRequest = z.infer<typeof updateOutreachDraftRequestSchema>;
 export type ListOutreachDraftsResponse = z.infer<typeof listOutreachDraftsResponseSchema>;

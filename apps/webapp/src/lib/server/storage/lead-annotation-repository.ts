@@ -45,6 +45,10 @@ export interface SaveLeadAnnotationInput {
 export interface LeadAnnotationRepository {
   listByRun: (runId: string) => Promise<LeadAnnotation[]>;
   listWithRunContext: (limit?: number) => Promise<LeadAnnotationRunRecord[]>;
+  getWithRunContext: (
+    runId: string,
+    candidateId: string
+  ) => Promise<LeadAnnotationRunRecord | null>;
   get: (runId: string, candidateId: string) => Promise<LeadAnnotation | null>;
   save: (input: SaveLeadAnnotationInput) => Promise<LeadAnnotation>;
 }
@@ -167,6 +171,34 @@ export function createLeadAnnotationRepository(): LeadAnnotationRepository {
       `;
 
       return rows.map(mapRowToRunRecord);
+    },
+
+    async getWithRunContext(runId, candidateId) {
+      const rows = await sql<LeadAnnotationRunRow[]>`
+        select
+          annotations.run_id,
+          annotations.candidate_id,
+          annotations.created_at,
+          annotations.updated_at,
+          annotations.state,
+          annotations.operator_note,
+          annotations.follow_up_date,
+          runs.created_at as run_created_at,
+          runs.updated_at as run_updated_at,
+          runs.raw_query,
+          runs.market_term,
+          runs.location_label,
+          runs.sample_quality,
+          runs.selected_candidates,
+          runs.business_results,
+          runs.shortlist
+        from scout_lead_annotations annotations
+        join scout_runs runs on runs.run_id = annotations.run_id
+        where annotations.run_id = ${runId} and annotations.candidate_id = ${candidateId}
+        limit 1
+      `;
+
+      return rows[0] ? mapRowToRunRecord(rows[0]) : null;
     },
 
     async get(runId, candidateId) {

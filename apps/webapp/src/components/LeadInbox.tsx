@@ -3,7 +3,10 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
-import { leadAnnotationResponseSchema } from "@scout/api-contracts";
+import {
+  leadAnnotationResponseSchema,
+  leadInboxItemResponseSchema
+} from "@scout/api-contracts";
 import type { LeadInboxItem, LeadStatus } from "@scout/domain";
 import { Tag } from "@scout/ui";
 
@@ -32,6 +35,8 @@ const filterOptions: Array<{ value: LeadInboxFilter; label: string }> = [
   { value: "contacted", label: "Contacted" },
   { value: "closed", label: "Closed" }
 ];
+
+type LeadAction = "analyze_contact" | "generate_draft" | "mark_contacted";
 
 function isClosed(state: LeadStatus): boolean {
   return state === "dismissed" || state === "not_a_fit";
@@ -162,14 +167,25 @@ export function LeadInbox({
     }));
   }
 
+  function replaceLead(item: LeadInboxItem) {
+    setItems((current) =>
+      current.map((currentItem) =>
+        currentItem.runId === item.runId && currentItem.candidateId === item.candidateId
+          ? item
+          : currentItem
+      )
+    );
+  }
+
   async function saveLead(item: LeadInboxItem) {
     const itemKey = `${item.runId}:${item.candidateId}`;
+    const actionKey = `${itemKey}:save`;
 
     if (pendingKey) {
       return;
     }
 
-    setPendingKey(itemKey);
+    setPendingKey(actionKey);
 
     const response = await fetch(
       `/api/runs/${encodeURIComponent(item.runId)}/leads/${encodeURIComponent(item.candidateId)}`,
@@ -210,6 +226,69 @@ export function LeadInbox({
     setMessageByKey((current) => ({
       ...current,
       [itemKey]: { text: "Saved", tone: "good" }
+    }));
+    setPendingKey(null);
+  }
+
+  async function runLeadAction(item: LeadInboxItem, action: LeadAction) {
+    const itemKey = `${item.runId}:${item.candidateId}`;
+    const actionKey = `${itemKey}:${action}`;
+
+    if (pendingKey) {
+      return;
+    }
+
+    setPendingKey(actionKey);
+    setMessageByKey((current) => ({
+      ...current,
+      [itemKey]: {
+        text:
+          action === "analyze_contact"
+            ? "Analyzing contact..."
+            : action === "generate_draft"
+              ? "Generating draft..."
+              : "Marking contacted...",
+        tone: "neutral"
+      }
+    }));
+
+    const response = await fetch(
+      `/api/leads/${encodeURIComponent(item.runId)}/${encodeURIComponent(item.candidateId)}/actions`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({ action })
+      }
+    );
+
+    if (!response.ok) {
+      const errorMessage = await readErrorMessage(response);
+      setMessageByKey((current) => ({
+        ...current,
+        [itemKey]: { text: errorMessage, tone: "danger" }
+      }));
+      setPendingKey(null);
+      return;
+    }
+
+    const body = leadInboxItemResponseSchema.parse(await response.json());
+    if (body.item) {
+      replaceLead(body.item);
+    }
+
+    setMessageByKey((current) => ({
+      ...current,
+      [itemKey]: {
+        text:
+          action === "analyze_contact"
+            ? "Contact analyzed"
+            : action === "generate_draft"
+              ? "Draft ready"
+              : "Marked contacted",
+        tone: "good"
+      }
     }));
     setPendingKey(null);
   }
@@ -265,7 +344,17 @@ export function LeadInbox({
           {visibleItems.map((item) => {
             const itemKey = `${item.runId}:${item.candidateId}`;
             const message = messageByKey[itemKey];
-            const busy = pendingKey === itemKey;
+            const saveBusy = pendingKey === `${itemKey}:save`;
+            const analyzeBusy = pendingKey === `${itemKey}:analyze_contact`;
+            const generateBusy = pendingKey === `${itemKey}:generate_draft`;
+            const markContactedBusy = pendingKey === `${itemKey}:mark_contacted`;
+            const canAnalyze = item.outreach.status === "no_draft";
+            const canGenerate =
+              item.outreach.status === "no_draft" ||
+              item.outreach.status === "contact_analyzed";
+            const canMarkContacted =
+              item.annotation.state !== "contacted" &&
+              (item.outreach.status === "draft_ready" || item.outreach.status === "edited_saved");
 
             return (
               <li className="report-card lead-inbox-card" key={itemKey}>
@@ -323,6 +412,36 @@ export function LeadInbox({
                     </div>
                   </div>
                   <div className="lead-inbox-actions">
+                    {canAnalyze ? (
+                      <button
+                        className="secondary-button"
+                        disabled={Boolean(pendingKey)}
+                        onClick={() => void runLeadAction(item, "analyze_contact")}
+                        type="button"
+                      >
+                        {analyzeBusy ? "Analyzing..." : "Analyze Contact"}
+                      </button>
+                    ) : null}
+                    {canGenerate ? (
+                      <button
+                        className="secondary-button"
+                        disabled={Boolean(pendingKey)}
+                        onClick={() => void runLeadAction(item, "generate_draft")}
+                        type="button"
+                      >
+                        {generateBusy ? "Generating..." : "Generate Draft"}
+                      </button>
+                    ) : null}
+                    {canMarkContacted ? (
+                      <button
+                        className="secondary-button"
+                        disabled={Boolean(pendingKey)}
+                        onClick={() => void runLeadAction(item, "mark_contacted")}
+                        type="button"
+                      >
+                        {markContactedBusy ? "Marking..." : "Mark Contacted"}
+                      </button>
+                    ) : null}
                     <Link
                       className="secondary-button"
                       href={`/runs/${encodeURIComponent(item.runId)}`}
@@ -413,7 +532,7 @@ export function LeadInbox({
                     onClick={() => void saveLead(item)}
                     type="button"
                   >
-                    {busy ? "Saving..." : "Save"}
+                    {saveBusy ? "Saving..." : "Save"}
                   </button>
                 </div>
               </li>

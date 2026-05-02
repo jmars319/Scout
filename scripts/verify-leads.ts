@@ -8,6 +8,7 @@ import {
   buildLeadExport,
   buildLeadInboxExport
 } from "../apps/webapp/src/lib/server/leads/lead-export-service.ts";
+import { runLeadInboxAction } from "../apps/webapp/src/lib/server/leads/lead-inbox-actions.ts";
 import {
   filterLeadInboxItems,
   listLeadInboxItems
@@ -369,6 +370,18 @@ try {
     grounding: ["Primary call to action is unclear."]
   });
 
+  const contactedInboxItem = await runLeadInboxAction({
+    runId: secondRunId,
+    candidateId: secondCandidateId,
+    action: {
+      action: "mark_contacted"
+    }
+  });
+
+  assert.equal(contactedInboxItem.annotation.state, "contacted");
+  assert.equal(contactedInboxItem.outreach.status, "contact_analyzed");
+  assert.equal(contactedInboxItem.outreach.nextAction, "Follow up");
+
   const inboxItems = await listLeadInboxItems(20);
   assert(inboxItems.some((item) => item.runId === runId && item.candidateId === candidateId));
   assert(
@@ -406,6 +419,7 @@ try {
   assert.match(inboxCsvExport.body, /Second Lead Workflow Shop/);
   assert.match(inboxCsvExport.body, /Contact Analyzed/);
   assert.match(inboxCsvExport.body, /Contact Form/);
+  assert.match(inboxCsvExport.body, /Follow up/);
 
   const inboxMarkdownExport = await buildLeadInboxExport({
     format: "markdown",
@@ -417,7 +431,7 @@ try {
   assert.match(inboxMarkdownExport.contentType, /text\/markdown/);
   assert.match(inboxMarkdownExport.body, /# Scout Lead Inbox/);
   assert.match(inboxMarkdownExport.body, /Second lead is due for owner follow-up\./);
-  assert.match(inboxMarkdownExport.body, /Draft outreach/);
+  assert.match(inboxMarkdownExport.body, /Follow up/);
 
   console.log("Lead workflow verification passed.");
 } finally {
