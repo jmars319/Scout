@@ -1,5 +1,6 @@
 import {
   leadAnnotationSchema,
+  leadInboxItemSchema,
   outreachDraftSchema,
   outreachProfileSchema,
   scoutQueryInputSchema,
@@ -44,6 +45,12 @@ export const listLeadAnnotationsResponseSchema = z.object({
 export const leadAnnotationResponseSchema = z.object({
   runId: z.string(),
   annotation: leadAnnotationSchema.optional(),
+  errorMessage: z.string().optional()
+});
+
+export const listLeadInboxResponseSchema = z.object({
+  generatedAt: z.iso.datetime(),
+  items: z.array(leadInboxItemSchema),
   errorMessage: z.string().optional()
 });
 
@@ -104,6 +111,7 @@ export type GetScoutRunResponse = z.infer<typeof getScoutRunResponseSchema>;
 export type UpdateLeadAnnotationRequest = z.infer<typeof updateLeadAnnotationRequestSchema>;
 export type ListLeadAnnotationsResponse = z.infer<typeof listLeadAnnotationsResponseSchema>;
 export type LeadAnnotationResponse = z.infer<typeof leadAnnotationResponseSchema>;
+export type ListLeadInboxResponse = z.infer<typeof listLeadInboxResponseSchema>;
 export type CreateOutreachDraftRequest = z.infer<typeof createOutreachDraftRequestSchema>;
 export type UpdateOutreachDraftRequest = z.infer<typeof updateOutreachDraftRequestSchema>;
 export type ListOutreachDraftsResponse = z.infer<typeof listOutreachDraftsResponseSchema>;

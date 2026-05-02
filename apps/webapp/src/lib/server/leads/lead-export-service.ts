@@ -1,12 +1,18 @@
 import type {
   BusinessBreakdown,
   LeadAnnotation,
+  LeadInboxItem,
   LeadOpportunity,
   LeadStatus,
   ScoutRunReport
 } from "@scout/domain";
 
 import { getScoutRun } from "../scout-runner.ts";
+import {
+  filterLeadInboxItems,
+  listLeadInboxItems,
+  type LeadInboxFilters
+} from "./lead-inbox-service.ts";
 import { getLeadAnnotations } from "./lead-workflow-service.ts";
 
 export type LeadExportFormat = "csv" | "markdown";
@@ -231,6 +237,89 @@ function buildMarkdown(report: ScoutRunReport, rows: LeadExportRow[], generatedA
     .trim();
 }
 
+function buildInboxCsv(items: LeadInboxItem[]): string {
+  const headers = [
+    "business_name",
+    "state",
+    "follow_up_date",
+    "market",
+    "query",
+    "run_id",
+    "shortlist_rank",
+    "priority_score",
+    "primary_url",
+    "presence_type",
+    "presence_quality",
+    "confidence",
+    "finding_count",
+    "high_severity_findings",
+    "top_issues",
+    "operator_note",
+    "reasons",
+    "candidate_id"
+  ];
+  const lines = items.map((item) =>
+    [
+      item.businessName,
+      humanize(item.annotation.state),
+      item.annotation.followUpDate ?? "",
+      item.marketTerm,
+      item.rawQuery,
+      item.runId,
+      item.shortlistRank ?? "",
+      item.priorityScore ?? "",
+      item.primaryUrl,
+      item.presenceType ? humanize(item.presenceType) : "",
+      item.presenceQuality ? humanize(item.presenceQuality) : "",
+      item.confidence ? humanize(item.confidence) : "",
+      item.findingCount,
+      item.highSeverityFindings,
+      item.topIssues.map(humanize).join("; "),
+      item.annotation.operatorNote,
+      item.reasons.join("; "),
+      item.candidateId
+    ]
+      .map(escapeCsv)
+      .join(",")
+  );
+
+  return [headers.join(","), ...lines].join("\n");
+}
+
+function buildInboxMarkdown(items: LeadInboxItem[], generatedAt: string): string {
+  const sections = items.map((item) => {
+    const lines = [
+      `## ${item.businessName}`,
+      "",
+      `- State: ${humanize(item.annotation.state)}`,
+      `- Follow up: ${item.annotation.followUpDate ?? "None"}`,
+      `- Market: ${item.marketTerm}`,
+      `- Query: ${item.rawQuery}`,
+      `- Run: ${item.runId}`,
+      `- URL: ${item.primaryUrl || "None"}`,
+      `- Shortlist rank: ${item.shortlistRank ?? "None"}`,
+      `- Priority score: ${item.priorityScore ?? "None"}`,
+      `- Presence: ${item.presenceType ? humanize(item.presenceType) : "Unknown"} / ${
+        item.presenceQuality ? humanize(item.presenceQuality) : "Unknown"
+      }`,
+      `- Confidence: ${item.confidence ? humanize(item.confidence) : "Unknown"}`,
+      `- Findings: ${item.findingCount} (${item.highSeverityFindings} high severity)`,
+      `- Top issues: ${item.topIssues.length > 0 ? item.topIssues.map(humanize).join(", ") : "None"}`,
+      `- Note: ${item.annotation.operatorNote || "None"}`
+    ];
+
+    if (item.reasons.length > 0) {
+      lines.push("", "Reasons:", ...item.reasons.map((reason) => `- ${reason}`));
+    }
+
+    return lines.join("\n");
+  });
+
+  return ["# Scout Lead Inbox", "", `Generated: ${generatedAt}`, "", ...sections]
+    .join("\n")
+    .trim();
+}
+
 export async function buildLeadExport(input: {
   runId: string;
   format: LeadExportFormat;
@@ -256,6 +345,32 @@ export async function buildLeadExport(input: {
 
   return {
     body: buildCsv(rows),
+    contentType: "text/csv; charset=utf-8",
+    filename: `${baseName}.csv`
+  };
+}
+
+export async function buildLeadInboxExport(input: {
+  format: LeadExportFormat;
+  filters?: LeadInboxFilters | undefined;
+}): Promise<LeadExportResult> {
+  const generatedAt = new Date().toISOString();
+  const items = filterLeadInboxItems(await listLeadInboxItems(500), {
+    ...input.filters,
+    today: input.filters?.today ?? generatedAt.slice(0, 10)
+  });
+  const baseName = `scout-lead-inbox-${generatedAt.slice(0, 10)}`;
+
+  if (input.format === "markdown") {
+    return {
+      body: buildInboxMarkdown(items, generatedAt),
+      contentType: "text/markdown; charset=utf-8",
+      filename: `${baseName}.md`
+    };
+  }
+
+  return {
+    body: buildInboxCsv(items),
     contentType: "text/csv; charset=utf-8",
     filename: `${baseName}.csv`
   };

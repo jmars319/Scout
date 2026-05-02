@@ -15,7 +15,7 @@ export function ScoutNavigation({
   currentRunId,
   currentRunLabel
 }: {
-  currentView: "home" | "runs" | "run" | "settings";
+  currentView: "home" | "runs" | "run" | "leads" | "settings";
   currentRunId?: string;
   currentRunLabel?: string;
 }) {
@@ -31,6 +31,13 @@ export function ScoutNavigation({
           href="/runs"
         >
           Runs
+        </Link>
+        <Link
+          aria-current={currentView === "leads" ? "page" : undefined}
+          className={navClassName(currentView === "leads")}
+          href="/leads"
+        >
+          Leads
         </Link>
         <Link
           aria-current={currentView === "settings" ? "page" : undefined}

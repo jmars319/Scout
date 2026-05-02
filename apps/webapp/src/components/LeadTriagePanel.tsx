@@ -6,6 +6,13 @@ import { leadAnnotationResponseSchema } from "@scout/api-contracts";
 import type { LeadAnnotation, LeadStatus } from "@scout/domain";
 import { Tag } from "@scout/ui";
 
+import {
+  formatLeadUpdatedAt,
+  labelForLeadStatus,
+  leadStatusOptions,
+  toneForLeadStatus
+} from "./lead-workflow-copy";
+
 export interface LeadTriageItem {
   candidateId: string;
   businessName: string;
@@ -37,11 +44,7 @@ interface LeadMessage {
 }
 
 const statusOptions: Array<{ value: LeadStatus; label: string }> = [
-  { value: "needs_review", label: "Needs Review" },
-  { value: "saved", label: "Saved" },
-  { value: "contacted", label: "Contacted" },
-  { value: "dismissed", label: "Dismissed" },
-  { value: "not_a_fit", label: "Not a Fit" }
+  ...leadStatusOptions
 ];
 
 const filterOptions: Array<{ value: LeadFilter; label: string }> = [
@@ -66,26 +69,6 @@ function buildInitialState(items: LeadTriageItem[]): Record<string, EditableLead
   );
 }
 
-function labelForStatus(state: LeadStatus): string {
-  return statusOptions.find((option) => option.value === state)?.label ?? state;
-}
-
-function toneForStatus(state: LeadStatus): "neutral" | "good" | "warn" | "danger" {
-  if (state === "saved") {
-    return "good";
-  }
-
-  if (state === "contacted") {
-    return "warn";
-  }
-
-  if (state === "dismissed" || state === "not_a_fit") {
-    return "danger";
-  }
-
-  return "neutral";
-}
-
 function matchesFilter(state: LeadStatus, filter: LeadFilter): boolean {
   if (filter === "all") {
     return true;
@@ -100,10 +83,6 @@ function matchesFilter(state: LeadStatus, filter: LeadFilter): boolean {
   }
 
   return state === filter;
-}
-
-function formatUpdatedAt(value: string): string {
-  return value.replace("T", " ").slice(0, 16);
 }
 
 async function readErrorMessage(response: Response): Promise<string> {
@@ -144,10 +123,14 @@ export function LeadTriagePanel({
 
   const visibleItems = useMemo(
     () =>
-      items.filter((item) =>
-        matchesFilter(annotationsByCandidate[item.candidateId]?.state ?? "needs_review", filter)
-      ),
-    [annotationsByCandidate, filter, items]
+      items.filter((item) => {
+        const isUnsaved = messageByCandidate[item.candidateId]?.text === "Unsaved";
+        return (
+          isUnsaved ||
+          matchesFilter(annotationsByCandidate[item.candidateId]?.state ?? "needs_review", filter)
+        );
+      }),
+    [annotationsByCandidate, filter, items, messageByCandidate]
   );
 
   function updateAnnotation(
@@ -286,8 +269,8 @@ export function LeadTriagePanel({
                     </a>
                   </div>
                   <div className="tag-row">
-                    <Tag tone={toneForStatus(annotation.state)}>
-                      {labelForStatus(annotation.state)}
+                    <Tag tone={toneForLeadStatus(annotation.state)}>
+                      {labelForLeadStatus(annotation.state)}
                     </Tag>
                     {item.shortlistRank ? <Tag tone="warn">Shortlist #{item.shortlistRank}</Tag> : null}
                     {item.priorityScore ? <Tag>{item.priorityScore} pts</Tag> : null}
@@ -373,7 +356,7 @@ export function LeadTriagePanel({
                   {message ? (
                     <span className={`status-note ${message.tone}`}>{message.text}</span>
                   ) : annotation.updatedAt ? (
-                    <span className="muted">Updated {formatUpdatedAt(annotation.updatedAt)}</span>
+                    <span className="muted">Updated {formatLeadUpdatedAt(annotation.updatedAt)}</span>
                   ) : null}
                   <button
                     className="link-button"

@@ -179,6 +179,30 @@ export const leadAnnotationSchema = z.object({
   updatedAt: z.iso.datetime()
 });
 
+export const leadInboxItemSchema = z.object({
+  runId: z.string(),
+  runCreatedAt: z.iso.datetime(),
+  runUpdatedAt: z.iso.datetime(),
+  rawQuery: z.string(),
+  marketTerm: z.string(),
+  locationLabel: z.string().optional(),
+  sampleQuality: z.enum(marketSampleQualities).optional(),
+  candidateId: z.string(),
+  businessName: z.string(),
+  primaryUrl: z.string(),
+  shortlistRank: z.number().int().positive().optional(),
+  priorityScore: z.number().optional(),
+  presenceType: z.enum(presenceTypes).optional(),
+  presenceQuality: z.enum(presenceQualities).optional(),
+  confidence: z.enum(confidenceLevels).optional(),
+  opportunityTypes: z.array(z.enum(opportunityTypes)),
+  findingCount: z.number().int().nonnegative(),
+  highSeverityFindings: z.number().int().nonnegative(),
+  topIssues: z.array(z.enum(auditIssueTypes)),
+  reasons: z.array(z.string()),
+  annotation: leadAnnotationSchema
+});
+
 export const businessBreakdownSchema = z.object({
   candidateId: z.string(),
   businessName: z.string(),

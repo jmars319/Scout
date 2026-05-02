@@ -1,4 +1,11 @@
-import type { LeadAnnotation, LeadStatus } from "@scout/domain";
+import type {
+  BusinessBreakdown,
+  LeadAnnotation,
+  LeadOpportunity,
+  LeadStatus,
+  MarketSampleQuality,
+  SearchCandidate
+} from "@scout/domain";
 import { leadAnnotationSchema } from "@scout/validation";
 
 import { getPostgresClient } from "./postgres-client.ts";
@@ -13,6 +20,20 @@ interface LeadAnnotationRow {
   follow_up_date: string | Date | null;
 }
 
+interface LeadAnnotationRunRow extends LeadAnnotationRow {
+  run_created_at: string | Date;
+  run_updated_at: string | Date;
+  raw_query: string;
+  market_term: string;
+  location_label: string | null;
+  sample_quality: MarketSampleQuality | null;
+  selected_candidates: SearchCandidate[];
+  business_results: {
+    businessBreakdowns: BusinessBreakdown[];
+  } | null;
+  shortlist: LeadOpportunity[];
+}
+
 export interface SaveLeadAnnotationInput {
   runId: string;
   candidateId: string;
@@ -23,8 +44,25 @@ export interface SaveLeadAnnotationInput {
 
 export interface LeadAnnotationRepository {
   listByRun: (runId: string) => Promise<LeadAnnotation[]>;
+  listWithRunContext: (limit?: number) => Promise<LeadAnnotationRunRecord[]>;
   get: (runId: string, candidateId: string) => Promise<LeadAnnotation | null>;
   save: (input: SaveLeadAnnotationInput) => Promise<LeadAnnotation>;
+}
+
+export interface LeadAnnotationRunRecord {
+  annotation: LeadAnnotation;
+  run: {
+    runId: string;
+    createdAt: string;
+    updatedAt: string;
+    rawQuery: string;
+    marketTerm: string;
+    locationLabel?: string | undefined;
+    sampleQuality?: MarketSampleQuality | undefined;
+    selectedCandidates: SearchCandidate[];
+    businessBreakdowns: BusinessBreakdown[];
+    shortlist: LeadOpportunity[];
+  };
 }
 
 function toIsoString(value: string | Date): string {
@@ -55,6 +93,32 @@ function mapRowToAnnotation(row: LeadAnnotationRow): LeadAnnotation {
   });
 }
 
+function normalizeLimit(limit: number | undefined): number {
+  if (!limit || !Number.isFinite(limit)) {
+    return 200;
+  }
+
+  return Math.min(Math.max(Math.trunc(limit), 1), 500);
+}
+
+function mapRowToRunRecord(row: LeadAnnotationRunRow): LeadAnnotationRunRecord {
+  return {
+    annotation: mapRowToAnnotation(row),
+    run: {
+      runId: row.run_id,
+      createdAt: toIsoString(row.run_created_at),
+      updatedAt: toIsoString(row.run_updated_at),
+      rawQuery: row.raw_query,
+      marketTerm: row.market_term,
+      ...(row.location_label ? { locationLabel: row.location_label } : {}),
+      ...(row.sample_quality ? { sampleQuality: row.sample_quality } : {}),
+      selectedCandidates: row.selected_candidates,
+      businessBreakdowns: row.business_results?.businessBreakdowns ?? [],
+      shortlist: row.shortlist
+    }
+  };
+}
+
 export function createLeadAnnotationRepository(): LeadAnnotationRepository {
   const sql = getPostgresClient();
 
@@ -75,6 +139,34 @@ export function createLeadAnnotationRepository(): LeadAnnotationRepository {
       `;
 
       return rows.map(mapRowToAnnotation);
+    },
+
+    async listWithRunContext(limit) {
+      const rows = await sql<LeadAnnotationRunRow[]>`
+        select
+          annotations.run_id,
+          annotations.candidate_id,
+          annotations.created_at,
+          annotations.updated_at,
+          annotations.state,
+          annotations.operator_note,
+          annotations.follow_up_date,
+          runs.created_at as run_created_at,
+          runs.updated_at as run_updated_at,
+          runs.raw_query,
+          runs.market_term,
+          runs.location_label,
+          runs.sample_quality,
+          runs.selected_candidates,
+          runs.business_results,
+          runs.shortlist
+        from scout_lead_annotations annotations
+        join scout_runs runs on runs.run_id = annotations.run_id
+        order by annotations.updated_at desc
+        limit ${normalizeLimit(limit)}
+      `;
+
+      return rows.map(mapRowToRunRecord);
     },
 
     async get(runId, candidateId) {

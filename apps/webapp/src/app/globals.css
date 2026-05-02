@@ -426,7 +426,9 @@ button[disabled] {
 }
 
 .lead-triage,
-.lead-triage-list {
+.lead-triage-list,
+.lead-inbox,
+.lead-inbox-list {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 0.9rem;
@@ -435,7 +437,10 @@ button[disabled] {
 
 .lead-triage-toolbar,
 .lead-triage-card-head,
-.lead-triage-save-row {
+.lead-triage-save-row,
+.lead-inbox-toolbar,
+.lead-inbox-card-head,
+.lead-inbox-save-row {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -444,30 +449,51 @@ button[disabled] {
   min-width: 0;
 }
 
-.lead-triage-actions {
+.lead-triage-actions,
+.lead-inbox-actions {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 0.6rem;
 }
 
-.lead-triage-list {
+.lead-triage-list,
+.lead-inbox-list {
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.lead-triage-card {
+.lead-triage-card,
+.lead-inbox-card {
   gap: 0.85rem;
 }
 
-.lead-triage-title {
+.lead-triage-title,
+.lead-inbox-title {
   display: grid;
   gap: 0.25rem;
   min-width: min(100%, 22rem);
 }
 
-.lead-triage-controls {
+.lead-inbox-search {
+  display: grid;
+  grid-template-columns: minmax(16rem, 1fr) minmax(0, auto);
+  gap: 0.7rem;
+  align-items: center;
+  min-width: 0;
+}
+
+.lead-inbox-meta {
+  display: grid;
+  grid-template-columns: minmax(14rem, 0.7fr) minmax(0, 1fr);
+  gap: 0.8rem;
+  align-items: start;
+  min-width: 0;
+}
+
+.lead-triage-controls,
+.lead-inbox-controls {
   display: grid;
   grid-template-columns: minmax(12rem, 0.8fr) minmax(10rem, 0.6fr);
   gap: 0.7rem;
@@ -492,12 +518,16 @@ button[disabled] {
 @media (max-width: 820px) {
   .candidate-review-fields,
   .candidate-review-row,
-  .lead-triage-controls {
+  .lead-triage-controls,
+  .lead-inbox-search,
+  .lead-inbox-meta,
+  .lead-inbox-controls {
     grid-template-columns: minmax(0, 1fr);
   }
 
   .candidate-review-actions,
-  .lead-triage-actions {
+  .lead-triage-actions,
+  .lead-inbox-actions {
     justify-content: flex-start;
   }
 }
@@ -862,6 +892,7 @@ html[data-theme="light"] .theme-toggle-thumb {
 .run-form input:focus-visible,
 .draft-input:focus-visible,
 .lead-triage select:focus-visible,
+.lead-inbox select:focus-visible,
 .draft-textarea:focus-visible,
 .inline-link:focus-visible,
 summary:focus-visible {

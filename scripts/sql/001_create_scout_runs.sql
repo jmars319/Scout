@@ -146,6 +146,9 @@ alter table scout_lead_annotations add column if not exists follow_up_date date;
 create index if not exists scout_lead_annotations_run_updated_idx
   on scout_lead_annotations (run_id, updated_at desc);
 
+create index if not exists scout_lead_annotations_updated_idx
+  on scout_lead_annotations (updated_at desc);
+
 create table if not exists scout_outreach_profiles (
   profile_id text primary key,
   updated_at timestamptz not null,

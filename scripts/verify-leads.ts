@@ -4,7 +4,14 @@ import type { ScoutRunReport } from "../packages/domain/src/model.ts";
 import { resolveMarketIntent } from "../packages/domain/src/query.ts";
 import { createEmptyAcquisitionDiagnostics } from "../packages/domain/src/report.ts";
 
-import { buildLeadExport } from "../apps/webapp/src/lib/server/leads/lead-export-service.ts";
+import {
+  buildLeadExport,
+  buildLeadInboxExport
+} from "../apps/webapp/src/lib/server/leads/lead-export-service.ts";
+import {
+  filterLeadInboxItems,
+  listLeadInboxItems
+} from "../apps/webapp/src/lib/server/leads/lead-inbox-service.ts";
 import {
   getLeadAnnotations,
   saveLeadAnnotation
@@ -20,7 +27,9 @@ loadWorkspaceEnv();
 const repository = createRunRepository();
 const createdAt = new Date();
 const runId = `verify-leads-${createdAt.toISOString().replace(/[:.]/g, "-")}`;
+const secondRunId = `verify-leads-cross-run-${createdAt.toISOString().replace(/[:.]/g, "-")}`;
 const candidateId = "lead-workflow-candidate";
+const secondCandidateId = "lead-workflow-second-candidate";
 const query = {
   rawQuery: "lead workflow verification shop in Winston-Salem, NC"
 };
@@ -159,9 +168,105 @@ const report: ScoutRunReport = {
   notes: ["Lead workflow verification run."]
 };
 
+function buildSecondReport(): ScoutRunReport {
+  const secondReport = structuredClone(report);
+  const secondQuery = {
+    rawQuery: "second lead workflow verification shop in Greensboro, NC"
+  };
+
+  secondReport.runId = secondRunId;
+  secondReport.createdAt = new Date(createdAt.getTime() + 1_000).toISOString();
+  secondReport.query = secondQuery;
+  secondReport.intent = resolveMarketIntent(secondQuery);
+  secondReport.candidates[0] = {
+    candidateId: secondCandidateId,
+    rank: 1,
+    title: "Second Lead Workflow Shop",
+    url: "https://second-lead-workflow.example",
+    domain: "second-lead-workflow.example",
+    snippet: "Second lead workflow verification fixture.",
+    source: "verification"
+  };
+  secondReport.presences[0] = {
+    candidateId: secondCandidateId,
+    businessName: "Second Lead Workflow Shop",
+    primaryUrl: "https://second-lead-workflow.example",
+    domain: "second-lead-workflow.example",
+    searchRank: 1,
+    presenceType: "owned_website",
+    auditEligible: true,
+    secondaryUrls: [],
+    detectionNotes: ["Owned website fixture for cross-run lead verification."]
+  };
+  secondReport.findings[0] = {
+    id: "second-lead-workflow-finding",
+    candidateId: secondCandidateId,
+    pageUrl: "https://second-lead-workflow.example",
+    pageLabel: "homepage",
+    viewport: "desktop",
+    issueType: "missing_primary_cta",
+    severity: "medium",
+    confidence: "confirmed",
+    message: "Primary call to action is unclear.",
+    reproductionNote: "The fixture records a deterministic CTA gap."
+  };
+  secondReport.classifications[0] = {
+    candidateId: secondCandidateId,
+    presenceQuality: "functional",
+    opportunityTypes: ["conversion_improvement"],
+    confidence: "confirmed",
+    rationale: ["Verification fixture should remain trackable across runs."]
+  };
+  secondReport.businessBreakdowns[0] = {
+    candidateId: secondCandidateId,
+    businessName: "Second Lead Workflow Shop",
+    primaryUrl: "https://second-lead-workflow.example",
+    searchRank: 1,
+    presenceType: "owned_website",
+    presenceQuality: "functional",
+    opportunityTypes: ["conversion_improvement"],
+    confidence: "confirmed",
+    findingCount: 1,
+    highSeverityFindings: 0,
+    audited: true,
+    auditStatus: "audited",
+    topIssues: ["missing_primary_cta"],
+    secondaryUrls: [],
+    detectionNotes: ["Owned website fixture for cross-run lead verification."]
+  };
+  secondReport.shortlist[0] = {
+    candidateId: secondCandidateId,
+    businessName: "Second Lead Workflow Shop",
+    primaryUrl: "https://second-lead-workflow.example",
+    presenceType: "owned_website",
+    presenceQuality: "functional",
+    opportunityTypes: ["conversion_improvement"],
+    confidence: "confirmed",
+    priorityScore: 62,
+    reasons: ["Primary call to action is unclear."]
+  };
+  secondReport.summary.qualityBreakdown = {
+    none: 0,
+    weak: 0,
+    functional: 1,
+    broken: 0,
+    strong: 0
+  };
+  secondReport.summary.commonIssues = [
+    {
+      issueType: "missing_primary_cta",
+      count: 1
+    }
+  ];
+  secondReport.notes = ["Second lead workflow verification run."];
+
+  return secondReport;
+}
+
 try {
   await applyScoutSchema();
   await repository.save(report);
+  await repository.save(buildSecondReport());
 
   const saved = await saveLeadAnnotation({
     runId,
@@ -205,9 +310,56 @@ try {
   assert.match(markdownExport.body, /# Scout Leads:/);
   assert.match(markdownExport.body, /Called the listed number\./);
 
+  await saveLeadAnnotation({
+    runId: secondRunId,
+    candidateId: secondCandidateId,
+    state: "saved",
+    operatorNote: "Second lead is due for owner follow-up.",
+    followUpDate: "2026-05-01"
+  });
+
+  const inboxItems = await listLeadInboxItems(20);
+  assert(inboxItems.some((item) => item.runId === runId && item.candidateId === candidateId));
+  assert(
+    inboxItems.some((item) => item.runId === secondRunId && item.candidateId === secondCandidateId)
+  );
+
+  const dueItems = filterLeadInboxItems(inboxItems, {
+    filter: "due",
+    today: "2026-05-02"
+  });
+  assert.equal(dueItems.length, 1);
+  assert.equal(dueItems[0]?.candidateId, secondCandidateId);
+
+  const searchedItems = filterLeadInboxItems(inboxItems, {
+    search: "second lead workflow"
+  });
+  assert(searchedItems.some((item) => item.candidateId === secondCandidateId));
+
+  const inboxCsvExport = await buildLeadInboxExport({
+    format: "csv",
+    filters: {
+      filter: "due",
+      today: "2026-05-02"
+    }
+  });
+  assert.match(inboxCsvExport.contentType, /text\/csv/);
+  assert.match(inboxCsvExport.body, /Second Lead Workflow Shop/);
+
+  const inboxMarkdownExport = await buildLeadInboxExport({
+    format: "markdown",
+    filters: {
+      search: "second lead workflow",
+      today: "2026-05-02"
+    }
+  });
+  assert.match(inboxMarkdownExport.contentType, /text\/markdown/);
+  assert.match(inboxMarkdownExport.body, /# Scout Lead Inbox/);
+  assert.match(inboxMarkdownExport.body, /Second lead is due for owner follow-up\./);
+
   console.log("Lead workflow verification passed.");
 } finally {
   const sql = getPostgresClient();
-  await sql`delete from scout_runs where run_id = ${runId}`;
+  await sql`delete from scout_runs where run_id = ${runId} or run_id = ${secondRunId}`;
   await closeScoutSchemaClient();
 }

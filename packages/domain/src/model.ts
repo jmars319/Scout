@@ -289,6 +289,30 @@ export interface LeadAnnotation {
   updatedAt: string;
 }
 
+export interface LeadInboxItem {
+  runId: string;
+  runCreatedAt: string;
+  runUpdatedAt: string;
+  rawQuery: string;
+  marketTerm: string;
+  locationLabel?: string | undefined;
+  sampleQuality?: MarketSampleQuality | undefined;
+  candidateId: string;
+  businessName: string;
+  primaryUrl: string;
+  shortlistRank?: number | undefined;
+  priorityScore?: number | undefined;
+  presenceType?: PresenceType | undefined;
+  presenceQuality?: PresenceQuality | undefined;
+  confidence?: ConfidenceLevel | undefined;
+  opportunityTypes: OpportunityType[];
+  findingCount: number;
+  highSeverityFindings: number;
+  topIssues: AuditIssueType[];
+  reasons: string[];
+  annotation: LeadAnnotation;
+}
+
 export interface CommonIssueCount {
   issueType: AuditIssueType;
   count: number;
