@@ -492,6 +492,18 @@ button[disabled] {
   min-width: 0;
 }
 
+.lead-inbox-outreach {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  padding: 0.85rem 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  min-width: 0;
+}
+
 .lead-triage-controls,
 .lead-inbox-controls {
   display: grid;
@@ -521,6 +533,7 @@ button[disabled] {
   .lead-triage-controls,
   .lead-inbox-search,
   .lead-inbox-meta,
+  .lead-inbox-outreach,
   .lead-inbox-controls {
     grid-template-columns: minmax(0, 1fr);
   }

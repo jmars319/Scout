@@ -10,8 +10,10 @@ import { Tag } from "@scout/ui";
 import {
   formatLeadUpdatedAt,
   humanizeLeadValue,
+  labelForLeadOutreachStatus,
   labelForLeadStatus,
   leadStatusOptions,
+  toneForLeadOutreachStatus,
   toneForLeadStatus
 } from "./lead-workflow-copy";
 
@@ -281,6 +283,9 @@ export function LeadInbox({
                       {labelForLeadStatus(item.annotation.state)}
                     </Tag>
                     {isDue(item, today) ? <Tag tone="warn">Due</Tag> : null}
+                    <Tag tone={toneForLeadOutreachStatus(item.outreach.status)}>
+                      {labelForLeadOutreachStatus(item.outreach.status)}
+                    </Tag>
                     {item.shortlistRank ? <Tag tone="warn">Shortlist #{item.shortlistRank}</Tag> : null}
                     {item.priorityScore ? <Tag>{item.priorityScore} pts</Tag> : null}
                   </div>
@@ -303,6 +308,33 @@ export function LeadInbox({
                     {item.highSeverityFindings > 0 ? (
                       <Tag tone="danger">{item.highSeverityFindings} high severity</Tag>
                     ) : null}
+                  </div>
+                </div>
+
+                <div className="lead-inbox-outreach">
+                  <div>
+                    <div className="section-label">Next Action</div>
+                    <div style={{ fontWeight: 700 }}>{item.outreach.nextAction}</div>
+                    <div className="muted">
+                      {item.outreach.recommendedChannelLabel ??
+                        (item.outreach.recommendedChannel
+                          ? humanizeLeadValue(item.outreach.recommendedChannel)
+                          : "No recommended channel yet")}
+                    </div>
+                  </div>
+                  <div className="lead-inbox-actions">
+                    <Link
+                      className="secondary-button"
+                      href={`/runs/${encodeURIComponent(item.runId)}`}
+                    >
+                      Report
+                    </Link>
+                    <Link
+                      className="link-button"
+                      href={`/runs/${encodeURIComponent(item.runId)}#outreach-workspace`}
+                    >
+                      Outreach
+                    </Link>
                   </div>
                 </div>
 

@@ -1,4 +1,4 @@
-import type { LeadStatus } from "@scout/domain";
+import type { LeadOutreachStatus, LeadStatus } from "@scout/domain";
 
 export const leadStatusOptions: Array<{ value: LeadStatus; label: string }> = [
   { value: "needs_review", label: "Needs Review" },
@@ -30,6 +30,36 @@ export function toneForLeadStatus(state: LeadStatus): "neutral" | "good" | "warn
 
   if (state === "dismissed" || state === "not_a_fit") {
     return "danger";
+  }
+
+  return "neutral";
+}
+
+export function labelForLeadOutreachStatus(status: LeadOutreachStatus): string {
+  if (status === "no_draft") {
+    return "No Draft";
+  }
+
+  if (status === "contact_analyzed") {
+    return "Contact Analyzed";
+  }
+
+  if (status === "draft_ready") {
+    return "Draft Ready";
+  }
+
+  return "Saved Draft";
+}
+
+export function toneForLeadOutreachStatus(
+  status: LeadOutreachStatus
+): "neutral" | "good" | "warn" | "danger" {
+  if (status === "draft_ready" || status === "edited_saved") {
+    return "good";
+  }
+
+  if (status === "contact_analyzed") {
+    return "warn";
   }
 
   return "neutral";

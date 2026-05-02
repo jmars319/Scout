@@ -2,12 +2,15 @@ import type {
   BusinessBreakdown,
   LeadAnnotation,
   LeadInboxItem,
+  LeadOutreachSummary,
   LeadOpportunity,
   LeadStatus,
+  OutreachDraft,
   ScoutRunReport
 } from "@scout/domain";
 
 import { getScoutRun } from "../scout-runner.ts";
+import { createOutreachDraftRepository } from "../storage/outreach-draft-repository.ts";
 import {
   filterLeadInboxItems,
   listLeadInboxItems,
@@ -33,6 +36,7 @@ interface LeadExportRow {
   highSeverityFindings: number;
   topIssues: string[];
   reasons: string[];
+  outreach: LeadOutreachSummary;
 }
 
 interface LeadExportResult {
@@ -76,10 +80,62 @@ function getAnnotation(
   );
 }
 
-function buildRows(report: ScoutRunReport, annotations: LeadAnnotation[]): LeadExportRow[] {
+function hasDraftContent(draft: OutreachDraft): boolean {
+  return Boolean(
+    draft.subjectLine.trim() ||
+      draft.body.trim() ||
+      draft.shortMessage?.trim() ||
+      draft.phoneTalkingPoints
+  );
+}
+
+function buildOutreachSummary(
+  annotation: Pick<LeadAnnotation, "state">,
+  draft: OutreachDraft | undefined
+): LeadOutreachSummary {
+  if (!draft) {
+    return {
+      status: "no_draft",
+      nextAction: annotation.state === "needs_review" ? "Review lead" : "Analyze contact"
+    };
+  }
+
+  const status = !hasDraftContent(draft)
+    ? "contact_analyzed"
+    : draft.model
+      ? "draft_ready"
+      : "edited_saved";
+  const recommendedChannelLabel = draft.recommendedChannel
+    ? draft.contactChannels.find((channel) => channel.kind === draft.recommendedChannel)?.label
+    : undefined;
+
+  return {
+    status,
+    nextAction:
+      annotation.state === "contacted"
+        ? "Follow up"
+        : annotation.state === "dismissed" || annotation.state === "not_a_fit"
+          ? "Closed"
+          : status === "contact_analyzed"
+            ? "Draft outreach"
+            : "Contact lead",
+    draftId: draft.draftId,
+    ...(draft.recommendedChannel ? { recommendedChannel: draft.recommendedChannel } : {}),
+    ...(recommendedChannelLabel ? { recommendedChannelLabel } : {}),
+    ...(draft.subjectLine.trim() ? { subjectLine: draft.subjectLine } : {}),
+    draftUpdatedAt: draft.updatedAt
+  };
+}
+
+function buildRows(
+  report: ScoutRunReport,
+  annotations: LeadAnnotation[],
+  drafts: OutreachDraft[]
+): LeadExportRow[] {
   const annotationsByCandidate = new Map(
     annotations.map((annotation) => [annotation.candidateId, annotation])
   );
+  const draftsByCandidate = new Map(drafts.map((draft) => [draft.candidateId, draft]));
   const breakdownByCandidate = new Map(
     report.businessBreakdowns.map((business) => [business.candidateId, business])
   );
@@ -98,6 +154,7 @@ function buildRows(report: ScoutRunReport, annotations: LeadAnnotation[]): LeadE
     const business = breakdownByCandidate.get(candidateId);
     const source = buildRowSource(candidateId, business, shortlist?.lead);
     const annotation = getAnnotation(annotationsByCandidate, candidateId);
+    const outreach = buildOutreachSummary(annotation, draftsByCandidate.get(candidateId));
 
     return {
       candidateId,
@@ -114,7 +171,8 @@ function buildRows(report: ScoutRunReport, annotations: LeadAnnotation[]): LeadE
       findingCount: source.findingCount,
       highSeverityFindings: source.highSeverityFindings,
       topIssues: source.topIssues,
-      reasons: shortlist?.lead.reasons ?? []
+      reasons: shortlist?.lead.reasons ?? [],
+      outreach
     };
   });
 }
@@ -172,6 +230,10 @@ function buildCsv(rows: LeadExportRow[]): string {
     "finding_count",
     "high_severity_findings",
     "top_issues",
+    "outreach_status",
+    "recommended_channel",
+    "outreach_next_action",
+    "draft_updated_at",
     "operator_note",
     "reasons",
     "candidate_id"
@@ -190,6 +252,10 @@ function buildCsv(rows: LeadExportRow[]): string {
       row.findingCount,
       row.highSeverityFindings,
       row.topIssues.join("; "),
+      humanize(row.outreach.status),
+      row.outreach.recommendedChannelLabel ?? (row.outreach.recommendedChannel ? humanize(row.outreach.recommendedChannel) : ""),
+      row.outreach.nextAction,
+      row.outreach.draftUpdatedAt ?? "",
       row.operatorNote,
       row.reasons.join("; "),
       row.candidateId
@@ -214,6 +280,12 @@ function buildMarkdown(report: ScoutRunReport, rows: LeadExportRow[], generatedA
       `- Confidence: ${row.confidence || "Unknown"}`,
       `- Findings: ${row.findingCount} (${row.highSeverityFindings} high severity)`,
       `- Top issues: ${row.topIssues.length > 0 ? row.topIssues.join(", ") : "None"}`,
+      `- Outreach: ${humanize(row.outreach.status)}`,
+      `- Recommended channel: ${
+        row.outreach.recommendedChannelLabel ??
+        (row.outreach.recommendedChannel ? humanize(row.outreach.recommendedChannel) : "None")
+      }`,
+      `- Next action: ${row.outreach.nextAction}`,
       `- Note: ${row.operatorNote || "None"}`
     ];
 
@@ -254,6 +326,10 @@ function buildInboxCsv(items: LeadInboxItem[]): string {
     "finding_count",
     "high_severity_findings",
     "top_issues",
+    "outreach_status",
+    "recommended_channel",
+    "outreach_next_action",
+    "draft_updated_at",
     "operator_note",
     "reasons",
     "candidate_id"
@@ -275,6 +351,11 @@ function buildInboxCsv(items: LeadInboxItem[]): string {
       item.findingCount,
       item.highSeverityFindings,
       item.topIssues.map(humanize).join("; "),
+      humanize(item.outreach.status),
+      item.outreach.recommendedChannelLabel ??
+        (item.outreach.recommendedChannel ? humanize(item.outreach.recommendedChannel) : ""),
+      item.outreach.nextAction,
+      item.outreach.draftUpdatedAt ?? "",
       item.annotation.operatorNote,
       item.reasons.join("; "),
       item.candidateId
@@ -305,6 +386,12 @@ function buildInboxMarkdown(items: LeadInboxItem[], generatedAt: string): string
       `- Confidence: ${item.confidence ? humanize(item.confidence) : "Unknown"}`,
       `- Findings: ${item.findingCount} (${item.highSeverityFindings} high severity)`,
       `- Top issues: ${item.topIssues.length > 0 ? item.topIssues.map(humanize).join(", ") : "None"}`,
+      `- Outreach: ${humanize(item.outreach.status)}`,
+      `- Recommended channel: ${
+        item.outreach.recommendedChannelLabel ??
+        (item.outreach.recommendedChannel ? humanize(item.outreach.recommendedChannel) : "None")
+      }`,
+      `- Next action: ${item.outreach.nextAction}`,
       `- Note: ${item.annotation.operatorNote || "None"}`
     ];
 
@@ -331,7 +418,8 @@ export async function buildLeadExport(input: {
   }
 
   const annotations = await getLeadAnnotations(input.runId);
-  const rows = buildRows(report, annotations);
+  const drafts = await createOutreachDraftRepository().listByRun(input.runId);
+  const rows = buildRows(report, annotations, drafts);
   const generatedAt = new Date().toISOString();
   const baseName = sanitizeFileSegment(`scout-leads-${report.intent.marketTerm}-${report.runId}`);
 

@@ -723,20 +723,22 @@ export function ReportView({
         <LeadTriagePanel items={leadTriageItems} runId={report.runId} />
       </Panel>
 
-      <Panel
-        title="Outreach Workspace"
-        description="Desktop-first outreach grounded on the stored Scout run. Scout can inspect contact paths, recommend the best first channel, and help draft email, short-form, and phone-ready follow-up without turning the product into an automation system."
-      >
-        <OutreachWorkspace
-          aiAvailable={outreach.aiAvailable}
-          defaultLength={outreach.defaultLength}
-          defaultTone={outreach.defaultTone}
-          initialDrafts={outreach.drafts}
-          leads={report.shortlist}
-          runId={report.runId}
-          {...(outreach.model ? { model: outreach.model } : {})}
-        />
-      </Panel>
+      <div id="outreach-workspace">
+        <Panel
+          title="Outreach Workspace"
+          description="Desktop-first outreach grounded on the stored Scout run. Scout can inspect contact paths, recommend the best first channel, and help draft email, short-form, and phone-ready follow-up without turning the product into an automation system."
+        >
+          <OutreachWorkspace
+            aiAvailable={outreach.aiAvailable}
+            defaultLength={outreach.defaultLength}
+            defaultTone={outreach.defaultTone}
+            initialDrafts={outreach.drafts}
+            leads={report.shortlist}
+            runId={report.runId}
+            {...(outreach.model ? { model: outreach.model } : {})}
+          />
+        </Panel>
+      </div>
 
       <Panel
         title="Business Breakdowns"

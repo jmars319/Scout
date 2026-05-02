@@ -53,6 +53,12 @@ export const leadStatuses = [
   "dismissed",
   "not_a_fit"
 ] as const;
+export const leadOutreachStatuses = [
+  "no_draft",
+  "contact_analyzed",
+  "draft_ready",
+  "edited_saved"
+] as const;
 
 export const viewportKinds = ["desktop", "mobile"] as const;
 export const marketSampleQualities = [
@@ -111,6 +117,7 @@ export type OutreachTone = (typeof outreachTones)[number];
 export type OutreachLength = (typeof outreachLengths)[number];
 export type OutreachChannelKind = (typeof outreachChannelKinds)[number];
 export type LeadStatus = (typeof leadStatuses)[number];
+export type LeadOutreachStatus = (typeof leadOutreachStatuses)[number];
 export type ViewportKind = (typeof viewportKinds)[number];
 export type AuditIssueType = (typeof auditIssueTypes)[number];
 export type MarketSampleQuality = (typeof marketSampleQualities)[number];
@@ -289,6 +296,16 @@ export interface LeadAnnotation {
   updatedAt: string;
 }
 
+export interface LeadOutreachSummary {
+  status: LeadOutreachStatus;
+  nextAction: string;
+  draftId?: string | undefined;
+  recommendedChannel?: OutreachChannelKind | undefined;
+  recommendedChannelLabel?: string | undefined;
+  subjectLine?: string | undefined;
+  draftUpdatedAt?: string | undefined;
+}
+
 export interface LeadInboxItem {
   runId: string;
   runCreatedAt: string;
@@ -310,6 +327,7 @@ export interface LeadInboxItem {
   highSeverityFindings: number;
   topIssues: AuditIssueType[];
   reasons: string[];
+  outreach: LeadOutreachSummary;
   annotation: LeadAnnotation;
 }
 

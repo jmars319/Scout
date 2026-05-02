@@ -17,6 +17,7 @@ import {
   saveLeadAnnotation
 } from "../apps/webapp/src/lib/server/leads/lead-workflow-service.ts";
 import { getPostgresClient } from "../apps/webapp/src/lib/server/storage/postgres-client.ts";
+import { createOutreachDraftRepository } from "../apps/webapp/src/lib/server/storage/outreach-draft-repository.ts";
 import { createRunRepository } from "../apps/webapp/src/lib/server/storage/run-repository.ts";
 
 import { loadWorkspaceEnv } from "./lib/env.ts";
@@ -35,6 +36,7 @@ const query = {
 };
 const intent = resolveMarketIntent(query);
 const acquisition = createEmptyAcquisitionDiagnostics("verification");
+const outreachDraftRepository = createOutreachDraftRepository();
 
 acquisition.rawCandidateCount = 1;
 acquisition.selectedCandidateCount = 1;
@@ -294,6 +296,31 @@ try {
   assert.equal(updated.state, "contacted");
   assert.equal(updated.followUpDate, undefined);
 
+  await outreachDraftRepository.save({
+    runId,
+    candidateId,
+    businessName: "Lead Workflow Verification Shop",
+    primaryUrl: "https://lead-workflow.example",
+    tone: "calm",
+    length: "standard",
+    recommendedChannel: "email",
+    contactChannels: [
+      {
+        kind: "email",
+        label: "Email",
+        value: "owner@lead-workflow.example",
+        score: 80,
+        reason: "Verification contact channel."
+      }
+    ],
+    contactRationale: ["Email is the clearest verification channel."],
+    subjectLine: "Website contact path",
+    body: "I noticed the website contact path may be hard to find and wanted to share a quick note.",
+    shortMessage: "Quick note about the website contact path.",
+    grounding: ["Contact path is not visible."],
+    model: "verification-model"
+  });
+
   const csvExport = await buildLeadExport({
     runId,
     format: "csv"
@@ -301,6 +328,7 @@ try {
   assert.match(csvExport.contentType, /text\/csv/);
   assert.match(csvExport.body, /Lead Workflow Verification Shop/);
   assert.match(csvExport.body, /Contacted/);
+  assert.match(csvExport.body, /Draft Ready/);
 
   const markdownExport = await buildLeadExport({
     runId,
@@ -318,10 +346,41 @@ try {
     followUpDate: "2026-05-01"
   });
 
+  await outreachDraftRepository.save({
+    runId: secondRunId,
+    candidateId: secondCandidateId,
+    businessName: "Second Lead Workflow Shop",
+    primaryUrl: "https://second-lead-workflow.example",
+    tone: "calm",
+    length: "standard",
+    recommendedChannel: "contact_form",
+    contactChannels: [
+      {
+        kind: "contact_form",
+        label: "Contact Form",
+        url: "https://second-lead-workflow.example/contact",
+        score: 72,
+        reason: "Verification contact form channel."
+      }
+    ],
+    contactRationale: ["Contact form is present in the verification fixture."],
+    subjectLine: "",
+    body: "",
+    grounding: ["Primary call to action is unclear."]
+  });
+
   const inboxItems = await listLeadInboxItems(20);
   assert(inboxItems.some((item) => item.runId === runId && item.candidateId === candidateId));
   assert(
     inboxItems.some((item) => item.runId === secondRunId && item.candidateId === secondCandidateId)
+  );
+  assert.equal(
+    inboxItems.find((item) => item.candidateId === candidateId)?.outreach.status,
+    "draft_ready"
+  );
+  assert.equal(
+    inboxItems.find((item) => item.candidateId === secondCandidateId)?.outreach.status,
+    "contact_analyzed"
   );
 
   const dueItems = filterLeadInboxItems(inboxItems, {
@@ -345,6 +404,8 @@ try {
   });
   assert.match(inboxCsvExport.contentType, /text\/csv/);
   assert.match(inboxCsvExport.body, /Second Lead Workflow Shop/);
+  assert.match(inboxCsvExport.body, /Contact Analyzed/);
+  assert.match(inboxCsvExport.body, /Contact Form/);
 
   const inboxMarkdownExport = await buildLeadInboxExport({
     format: "markdown",
@@ -356,6 +417,7 @@ try {
   assert.match(inboxMarkdownExport.contentType, /text\/markdown/);
   assert.match(inboxMarkdownExport.body, /# Scout Lead Inbox/);
   assert.match(inboxMarkdownExport.body, /Second lead is due for owner follow-up\./);
+  assert.match(inboxMarkdownExport.body, /Draft outreach/);
 
   console.log("Lead workflow verification passed.");
 } finally {

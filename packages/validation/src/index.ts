@@ -6,6 +6,7 @@ import {
   candidateProvenanceKinds,
   confidenceLevels,
   findingSeverities,
+  leadOutreachStatuses,
   leadStatuses,
   marketSampleQualities,
   runExecutionStages,
@@ -179,6 +180,16 @@ export const leadAnnotationSchema = z.object({
   updatedAt: z.iso.datetime()
 });
 
+export const leadOutreachSummarySchema = z.object({
+  status: z.enum(leadOutreachStatuses),
+  nextAction: z.string(),
+  draftId: z.string().optional(),
+  recommendedChannel: z.enum(outreachChannelKinds).optional(),
+  recommendedChannelLabel: z.string().optional(),
+  subjectLine: z.string().optional(),
+  draftUpdatedAt: z.iso.datetime().optional()
+});
+
 export const leadInboxItemSchema = z.object({
   runId: z.string(),
   runCreatedAt: z.iso.datetime(),
@@ -200,6 +211,7 @@ export const leadInboxItemSchema = z.object({
   highSeverityFindings: z.number().int().nonnegative(),
   topIssues: z.array(z.enum(auditIssueTypes)),
   reasons: z.array(z.string()),
+  outreach: leadOutreachSummarySchema,
   annotation: leadAnnotationSchema
 });
 

@@ -51,6 +51,7 @@ export interface SaveOutreachDraftInput {
 
 export interface OutreachDraftRepository {
   listByRun: (runId: string) => Promise<OutreachDraft[]>;
+  listByRunIds: (runIds: string[]) => Promise<OutreachDraft[]>;
   get: (runId: string, candidateId: string) => Promise<OutreachDraft | null>;
   save: (input: SaveOutreachDraftInput) => Promise<OutreachDraft>;
 }
@@ -136,6 +137,41 @@ export function createOutreachDraftRepository(): OutreachDraftRepository {
           model
         from scout_outreach_drafts
         where run_id = ${runId}
+        order by updated_at desc
+      `;
+
+      return rows.map(mapRowToDraft);
+    },
+
+    async listByRunIds(runIds) {
+      const uniqueRunIds = [...new Set(runIds.filter(Boolean))];
+
+      if (uniqueRunIds.length === 0) {
+        return [];
+      }
+
+      const rows = await sql<OutreachDraftRow[]>`
+        select
+          draft_id,
+          run_id,
+          candidate_id,
+          created_at,
+          updated_at,
+          business_name,
+          primary_url,
+          tone,
+          draft_length,
+          recommended_channel,
+          contact_channels,
+          contact_rationale,
+          subject_line,
+          body,
+          short_message,
+          phone_talking_points,
+          grounding,
+          model
+        from scout_outreach_drafts
+        where run_id = any(${sql.array(uniqueRunIds)})
         order by updated_at desc
       `;
 

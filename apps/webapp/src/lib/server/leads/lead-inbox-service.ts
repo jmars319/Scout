@@ -1,6 +1,12 @@
-import type { LeadInboxItem, LeadStatus } from "@scout/domain";
+import type {
+  LeadInboxItem,
+  LeadOutreachSummary,
+  LeadStatus,
+  OutreachDraft
+} from "@scout/domain";
 
 import { createLeadAnnotationRepository } from "../storage/lead-annotation-repository.ts";
+import { createOutreachDraftRepository } from "../storage/outreach-draft-repository.ts";
 
 export type LeadInboxFilter = "all" | "open" | "saved" | "contacted" | "closed" | "due";
 
@@ -24,6 +30,81 @@ function isDue(item: LeadInboxItem, today: string): boolean {
       item.annotation.followUpDate <= today &&
       !isClosed(item.annotation.state)
   );
+}
+
+function hasDraftContent(draft: OutreachDraft): boolean {
+  return Boolean(
+    draft.subjectLine.trim() ||
+      draft.body.trim() ||
+      draft.shortMessage?.trim() ||
+      draft.phoneTalkingPoints
+  );
+}
+
+function resolveOutreachStatus(draft: OutreachDraft | undefined): LeadOutreachSummary["status"] {
+  if (!draft) {
+    return "no_draft";
+  }
+
+  if (!hasDraftContent(draft)) {
+    return "contact_analyzed";
+  }
+
+  return draft.model ? "draft_ready" : "edited_saved";
+}
+
+function resolveRecommendedChannelLabel(draft: OutreachDraft): string | undefined {
+  if (!draft.recommendedChannel) {
+    return undefined;
+  }
+
+  return draft.contactChannels.find((channel) => channel.kind === draft.recommendedChannel)?.label;
+}
+
+function resolveNextAction(state: LeadStatus, outreachStatus: LeadOutreachSummary["status"]): string {
+  if (state === "contacted") {
+    return "Follow up";
+  }
+
+  if (state === "dismissed" || state === "not_a_fit") {
+    return "Closed";
+  }
+
+  if (outreachStatus === "no_draft") {
+    return state === "needs_review" ? "Review lead" : "Analyze contact";
+  }
+
+  if (outreachStatus === "contact_analyzed") {
+    return "Draft outreach";
+  }
+
+  return "Contact lead";
+}
+
+function buildOutreachSummary(
+  state: LeadStatus,
+  draft: OutreachDraft | undefined
+): LeadOutreachSummary {
+  const status = resolveOutreachStatus(draft);
+
+  if (!draft) {
+    return {
+      status,
+      nextAction: resolveNextAction(state, status)
+    };
+  }
+
+  const recommendedChannelLabel = resolveRecommendedChannelLabel(draft);
+
+  return {
+    status,
+    nextAction: resolveNextAction(state, status),
+    draftId: draft.draftId,
+    ...(draft.recommendedChannel ? { recommendedChannel: draft.recommendedChannel } : {}),
+    ...(recommendedChannelLabel ? { recommendedChannelLabel } : {}),
+    ...(draft.subjectLine.trim() ? { subjectLine: draft.subjectLine } : {}),
+    draftUpdatedAt: draft.updatedAt
+  };
 }
 
 function matchesFilter(item: LeadInboxItem, filter: LeadInboxFilter, today: string): boolean {
@@ -98,6 +179,10 @@ export function filterLeadInboxItems(
 export async function listLeadInboxItems(limit = 200): Promise<LeadInboxItem[]> {
   const repository = createLeadAnnotationRepository();
   const records = await repository.listWithRunContext(limit);
+  const drafts = await createOutreachDraftRepository().listByRunIds(
+    records.map((record) => record.run.runId)
+  );
+  const draftByLead = new Map(drafts.map((draft) => [`${draft.runId}:${draft.candidateId}`, draft]));
 
   return records.map((record) => {
     const business = record.run.businessBreakdowns.find(
@@ -113,6 +198,7 @@ export async function listLeadInboxItems(limit = 200): Promise<LeadInboxItem[]> 
     const presenceType = business?.presenceType ?? shortlist?.presenceType;
     const presenceQuality = business?.presenceQuality ?? shortlist?.presenceQuality;
     const confidence = business?.confidence ?? shortlist?.confidence;
+    const draft = draftByLead.get(`${record.run.runId}:${record.annotation.candidateId}`);
 
     return {
       runId: record.run.runId,
@@ -139,6 +225,7 @@ export async function listLeadInboxItems(limit = 200): Promise<LeadInboxItem[]> 
       highSeverityFindings: business?.highSeverityFindings ?? 0,
       topIssues: business?.topIssues ?? [],
       reasons: shortlist?.reasons ?? [],
+      outreach: buildOutreachSummary(record.annotation.state, draft),
       annotation: record.annotation
     };
   });
