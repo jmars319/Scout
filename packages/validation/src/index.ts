@@ -6,6 +6,7 @@ import {
   candidateProvenanceKinds,
   confidenceLevels,
   findingSeverities,
+  leadStatuses,
   marketSampleQualities,
   runExecutionStages,
   outreachChannelKinds,
@@ -162,6 +163,20 @@ export const leadOpportunitySchema = z.object({
   confidence: z.enum(confidenceLevels),
   priorityScore: z.number(),
   reasons: z.array(z.string())
+});
+
+export const followUpDateSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Expected a follow-up date in YYYY-MM-DD format.");
+
+export const leadAnnotationSchema = z.object({
+  runId: z.string(),
+  candidateId: z.string(),
+  state: z.enum(leadStatuses),
+  operatorNote: z.string(),
+  followUpDate: followUpDateSchema.optional(),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime()
 });
 
 export const businessBreakdownSchema = z.object({

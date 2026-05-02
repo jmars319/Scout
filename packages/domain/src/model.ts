@@ -46,6 +46,13 @@ export const outreachChannelKinds = [
   "linkedin_message",
   "website"
 ] as const;
+export const leadStatuses = [
+  "needs_review",
+  "saved",
+  "contacted",
+  "dismissed",
+  "not_a_fit"
+] as const;
 
 export const viewportKinds = ["desktop", "mobile"] as const;
 export const marketSampleQualities = [
@@ -103,6 +110,7 @@ export type RunExecutionStage = (typeof runExecutionStages)[number];
 export type OutreachTone = (typeof outreachTones)[number];
 export type OutreachLength = (typeof outreachLengths)[number];
 export type OutreachChannelKind = (typeof outreachChannelKinds)[number];
+export type LeadStatus = (typeof leadStatuses)[number];
 export type ViewportKind = (typeof viewportKinds)[number];
 export type AuditIssueType = (typeof auditIssueTypes)[number];
 export type MarketSampleQuality = (typeof marketSampleQualities)[number];
@@ -269,6 +277,16 @@ export interface LeadOpportunity {
   confidence: ConfidenceLevel;
   priorityScore: number;
   reasons: string[];
+}
+
+export interface LeadAnnotation {
+  runId: string;
+  candidateId: string;
+  state: LeadStatus;
+  operatorNote: string;
+  followUpDate?: string | undefined;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface CommonIssueCount {

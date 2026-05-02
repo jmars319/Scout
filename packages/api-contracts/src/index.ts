@@ -1,4 +1,5 @@
 import {
+  leadAnnotationSchema,
   outreachDraftSchema,
   outreachProfileSchema,
   scoutQueryInputSchema,
@@ -6,6 +7,7 @@ import {
 } from "@scout/validation";
 import { z } from "zod";
 
+const leadStatuses = ["needs_review", "saved", "contacted", "dismissed", "not_a_fit"] as const;
 const outreachTones = ["calm", "direct", "friendly"] as const;
 const outreachLengths = ["brief", "standard"] as const;
 
@@ -22,6 +24,26 @@ export const getScoutRunResponseSchema = z.object({
   runId: z.string(),
   status: z.enum(["queued", "running", "completed", "failed", "not_found"]),
   report: scoutRunReportSchema.optional(),
+  errorMessage: z.string().optional()
+});
+
+export const updateLeadAnnotationRequestSchema = z.object({
+  state: z.enum(leadStatuses),
+  operatorNote: z.string().trim().max(1600).default(""),
+  followUpDate: z
+    .union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/), z.null()])
+    .optional()
+});
+
+export const listLeadAnnotationsResponseSchema = z.object({
+  runId: z.string(),
+  annotations: z.array(leadAnnotationSchema),
+  errorMessage: z.string().optional()
+});
+
+export const leadAnnotationResponseSchema = z.object({
+  runId: z.string(),
+  annotation: leadAnnotationSchema.optional(),
   errorMessage: z.string().optional()
 });
 
@@ -79,6 +101,9 @@ export const outreachProfileResponseSchema = z.object({
 export type CreateScoutRunRequest = z.infer<typeof createScoutRunRequestSchema>;
 export type CreateScoutRunResponse = z.infer<typeof createScoutRunResponseSchema>;
 export type GetScoutRunResponse = z.infer<typeof getScoutRunResponseSchema>;
+export type UpdateLeadAnnotationRequest = z.infer<typeof updateLeadAnnotationRequestSchema>;
+export type ListLeadAnnotationsResponse = z.infer<typeof listLeadAnnotationsResponseSchema>;
+export type LeadAnnotationResponse = z.infer<typeof leadAnnotationResponseSchema>;
 export type CreateOutreachDraftRequest = z.infer<typeof createOutreachDraftRequestSchema>;
 export type UpdateOutreachDraftRequest = z.infer<typeof updateOutreachDraftRequestSchema>;
 export type ListOutreachDraftsResponse = z.infer<typeof listOutreachDraftsResponseSchema>;

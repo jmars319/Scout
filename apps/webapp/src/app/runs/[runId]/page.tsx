@@ -7,6 +7,7 @@ import { ReportView } from "@/components/ReportView";
 import { RunStatusView } from "@/components/RunStatusView";
 import { ScoutNavigation } from "@/components/ScoutNavigation";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { getLeadAnnotations } from "@/lib/server/leads/lead-workflow-service";
 import { getOutreachWorkspaceState } from "@/lib/server/outreach/outreach-service";
 import { getScoutRun, getScoutRunRecord } from "@/lib/server/scout-runner";
 
@@ -25,7 +26,9 @@ export default async function RunPage({
   }
 
   const report = await getScoutRun(runId);
-  const outreach = report ? await getOutreachWorkspaceState(runId) : null;
+  const [outreach, leadAnnotations] = report
+    ? await Promise.all([getOutreachWorkspaceState(runId), getLeadAnnotations(runId)])
+    : [null, []];
 
   return (
     <AppFrame
@@ -51,7 +54,11 @@ export default async function RunPage({
         </div>
       }
     >
-      {report && outreach ? <ReportView report={report} outreach={outreach} /> : <RunStatusView record={record} />}
+      {report && outreach ? (
+        <ReportView leadAnnotations={leadAnnotations} outreach={outreach} report={report} />
+      ) : (
+        <RunStatusView record={record} />
+      )}
     </AppFrame>
   );
 }

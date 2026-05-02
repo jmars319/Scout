@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import type {
   AuditFinding,
+  LeadAnnotation,
   OutreachDraft,
   OutreachLength,
   OutreachTone,
@@ -10,6 +11,10 @@ import type {
 import { Metric, MetricGrid, Panel, Tag } from "@scout/ui";
 
 import { CandidateReviewPanel } from "./CandidateReviewPanel";
+import {
+  LeadTriagePanel,
+  type LeadTriageItem
+} from "./LeadTriagePanel";
 import { OutreachWorkspace } from "./OutreachWorkspace";
 import {
   describeSampleQuality,
@@ -316,9 +321,67 @@ function buildListKey(prefix: string, index: number): string {
   return `${prefix}-${index}`;
 }
 
+function buildLeadTriageItems(
+  report: ScoutRunReport,
+  annotations: LeadAnnotation[]
+): LeadTriageItem[] {
+  const annotationsByCandidate = new Map(
+    annotations.map((annotation) => [annotation.candidateId, annotation])
+  );
+  const shortlistByCandidate = new Map(
+    report.shortlist.map((lead, index) => [lead.candidateId, { lead, rank: index + 1 }])
+  );
+  const items = report.businessBreakdowns.map((business) => {
+    const shortlist = shortlistByCandidate.get(business.candidateId);
+    const annotation = annotationsByCandidate.get(business.candidateId);
+
+    return {
+      candidateId: business.candidateId,
+      businessName: business.businessName,
+      primaryUrl: business.primaryUrl,
+      presenceType: humanize(business.presenceType),
+      presenceQuality: humanize(business.presenceQuality),
+      confidence: humanize(business.confidence),
+      findingCount: business.findingCount,
+      highSeverityFindings: business.highSeverityFindings,
+      topIssues: business.topIssues.map(humanize),
+      reasons: shortlist?.lead.reasons ?? [],
+      ...(shortlist ? { shortlistRank: shortlist.rank, priorityScore: shortlist.lead.priorityScore } : {}),
+      ...(annotation ? { annotation } : {})
+    };
+  });
+  const knownIds = new Set(items.map((item) => item.candidateId));
+
+  for (const [candidateId, shortlist] of shortlistByCandidate) {
+    if (knownIds.has(candidateId)) {
+      continue;
+    }
+
+    const annotation = annotationsByCandidate.get(candidateId);
+    items.push({
+      candidateId,
+      businessName: shortlist.lead.businessName,
+      primaryUrl: shortlist.lead.primaryUrl,
+      presenceType: humanize(shortlist.lead.presenceType),
+      presenceQuality: humanize(shortlist.lead.presenceQuality),
+      confidence: humanize(shortlist.lead.confidence),
+      findingCount: 0,
+      highSeverityFindings: 0,
+      topIssues: [],
+      reasons: shortlist.lead.reasons,
+      shortlistRank: shortlist.rank,
+      priorityScore: shortlist.lead.priorityScore,
+      ...(annotation ? { annotation } : {})
+    });
+  }
+
+  return items;
+}
+
 export function ReportView({
   report,
-  outreach
+  outreach,
+  leadAnnotations
 }: {
   report: ScoutRunReport;
   outreach: {
@@ -328,6 +391,7 @@ export function ReportView({
     model?: string | undefined;
     drafts: OutreachDraft[];
   };
+  leadAnnotations: LeadAnnotation[];
 }) {
   const findingsByCandidate = groupFindings(report.findings);
   const ownedWebsiteCount = report.presences.filter(
@@ -344,6 +408,7 @@ export function ReportView({
   );
   const sampleConfidenceReasons = buildSampleConfidenceReasons(report);
   const candidatesById = new Map(report.candidates.map((candidate) => [candidate.candidateId, candidate]));
+  const leadTriageItems = buildLeadTriageItems(report, leadAnnotations);
 
   return (
     <div className="scout-shell">
@@ -652,6 +717,10 @@ export function ReportView({
             Scout did not identify any shortlist candidates from this run.
           </p>
         )}
+      </Panel>
+
+      <Panel title="Lead Triage">
+        <LeadTriagePanel items={leadTriageItems} runId={report.runId} />
       </Panel>
 
       <Panel

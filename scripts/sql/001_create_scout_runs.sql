@@ -126,6 +126,26 @@ alter table scout_outreach_drafts add column if not exists phone_talking_points 
 create index if not exists scout_outreach_drafts_run_updated_idx
   on scout_outreach_drafts (run_id, updated_at desc);
 
+create table if not exists scout_lead_annotations (
+  run_id text not null references scout_runs (run_id) on delete cascade,
+  candidate_id text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  state text not null default 'needs_review' check (
+    state in ('needs_review', 'saved', 'contacted', 'dismissed', 'not_a_fit')
+  ),
+  operator_note text not null default '',
+  follow_up_date date,
+  primary key (run_id, candidate_id)
+);
+
+alter table scout_lead_annotations add column if not exists state text not null default 'needs_review';
+alter table scout_lead_annotations add column if not exists operator_note text not null default '';
+alter table scout_lead_annotations add column if not exists follow_up_date date;
+
+create index if not exists scout_lead_annotations_run_updated_idx
+  on scout_lead_annotations (run_id, updated_at desc);
+
 create table if not exists scout_outreach_profiles (
   profile_id text primary key,
   updated_at timestamptz not null,
