@@ -363,6 +363,17 @@ summary {
   color: var(--muted);
 }
 
+.sample-confidence-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.55rem;
+  margin: 0 0 1rem;
+  padding: 0.8rem 0 0.9rem;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  min-width: 0;
+}
+
 .note-list {
   margin: 0;
   padding-left: 1rem;

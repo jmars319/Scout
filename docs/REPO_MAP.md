@@ -52,7 +52,7 @@
 - `src/components`
   Thin UI components for run submission and report rendering.
 - `src/lib/server/search`
-  Search provider seam, live DuckDuckGo HTML implementation, seeded fallback, and presence detection.
+  Search provider seam, live DuckDuckGo, Google, and Bing HTML implementations, verification-only seeded provider, acquisition diagnostics, and presence detection.
 - `src/lib/server/audit`
   Playwright audit implementation and page heuristics.
 - `src/lib/server/storage`

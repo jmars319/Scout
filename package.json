@@ -28,6 +28,7 @@
     "build:desktop": "pnpm --filter @scout/desktopapp build",
     "build:mobile": "pnpm --filter @scout/mobileapp build",
     "package:desktop": "pnpm --filter @scout/desktopapp run dist:mac",
+    "package:desktop:release": "pnpm --filter @scout/desktopapp run dist:mac:release",
     "lint": "pnpm exec eslint .",
     "typecheck": "pnpm --filter \"./packages/**\" --if-present typecheck && pnpm --filter \"./apps/**\" --if-present typecheck",
     "verify:acquisition": "node --no-warnings --experimental-strip-types --experimental-specifier-resolution=node ./scripts/verify-acquisition.ts",

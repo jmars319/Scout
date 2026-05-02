@@ -10,6 +10,11 @@ import type {
 import { Metric, MetricGrid, Panel, Tag } from "@scout/ui";
 
 import { OutreachWorkspace } from "./OutreachWorkspace";
+import {
+  describeSampleQuality,
+  describeSampleQualityMeaning,
+  toneForSampleQuality
+} from "./sample-quality-copy";
 
 function humanize(value: string): string {
   return value
@@ -125,20 +130,14 @@ function toneForAuditStatus(status: "audited" | "skipped"): "neutral" | "good" |
   return status === "audited" ? "good" : "warn";
 }
 
-function toneForSampleQuality(sampleQuality: ScoutRunReport["summary"]["sampleQuality"]): "neutral" | "good" | "warn" | "danger" {
-  if (sampleQuality === "strong_sample") {
-    return "good";
-  }
-
-  if (sampleQuality === "adequate_sample") {
-    return "neutral";
-  }
-
-  if (sampleQuality === "partial_sample") {
-    return "warn";
-  }
-
-  return "danger";
+function toneForSampleMetric(
+  sampleQuality: ScoutRunReport["summary"]["sampleQuality"]
+): "neutral" | "good" | "warn" {
+  return toneForSampleQuality(sampleQuality) === "good"
+    ? "good"
+    : toneForSampleQuality(sampleQuality) === "neutral"
+      ? "neutral"
+      : "warn";
 }
 
 function toneForAcquisitionTrust(report: ScoutRunReport): "neutral" | "good" | "warn" | "danger" {
@@ -184,6 +183,64 @@ function describeAcquisitionTrust(report: ScoutRunReport): string {
   }
 
   return "Live acquisition needed seeded help to fill gaps in the final sample.";
+}
+
+function buildAttemptSummary(
+  attempts: ScoutRunReport["acquisition"]["providerAttempts"]
+): string {
+  return attempts
+    .map(
+      (attempt) =>
+        `${describeProviderName(attempt.provider)} ${describeAttemptOutcome(attempt.outcome)}`
+    )
+    .join(", ");
+}
+
+function buildSampleConfidenceReasons(report: ScoutRunReport): string[] {
+  const reasons: string[] = [];
+  const degradedLiveAttempts = report.acquisition.providerAttempts.filter(
+    (attempt) => attempt.kind === "live" && attempt.outcome !== "success" && attempt.outcome !== "empty"
+  );
+  const profilePresenceCount = report.businessBreakdowns.filter((business) =>
+    ["facebook_only", "yelp_only", "directory_only", "marketplace"].includes(business.presenceType)
+  ).length;
+  const keptCount = Math.max(report.acquisition.selectedCandidateCount, report.businessBreakdowns.length);
+
+  if (degradedLiveAttempts.length > 0) {
+    reasons.push(`Live provider issue: ${buildAttemptSummary(degradedLiveAttempts)}.`);
+  }
+
+  if (report.acquisition.discardedCandidateCount > 0) {
+    reasons.push(
+      `Scout discarded ${report.acquisition.discardedCandidateCount} low-value or non-specific result(s) before keeping ${report.acquisition.selectedCandidateCount}.`
+    );
+  }
+
+  if (keptCount > 0 && profilePresenceCount / keptCount >= 0.35) {
+    reasons.push(
+      `${profilePresenceCount} of ${keptCount} kept candidate(s) were directory, marketplace, or social/profile presences.`
+    );
+  }
+
+  if (report.acquisition.fallbackCandidateCount > 0) {
+    reasons.push(
+      `${report.acquisition.fallbackCandidateCount} kept candidate(s) came from verification fallback instead of live search.`
+    );
+  }
+
+  if (report.acquisition.selectedCandidateCount > 0 && report.acquisition.selectedCandidateCount < 10) {
+    reasons.push(
+      `Only ${report.acquisition.selectedCandidateCount} final candidate(s) survived acquisition filtering.`
+    );
+  }
+
+  if (reasons.length > 0) {
+    return reasons.slice(0, 4);
+  }
+
+  return report.acquisition.notes.length > 0
+    ? report.acquisition.notes.slice(0, 3)
+    : [describeSampleQualityMeaning(report.acquisition.sampleQuality)];
 }
 
 function groupFindings(findings: AuditFinding[]): Map<string, AuditFinding[]> {
@@ -252,6 +309,7 @@ export function ReportView({
   const degradedLiveAttempts = report.acquisition.providerAttempts.filter(
     (attempt) => attempt.kind === "live" && attempt.outcome !== "success"
   );
+  const sampleConfidenceReasons = buildSampleConfidenceReasons(report);
 
   return (
     <div className="scout-shell">
@@ -270,16 +328,9 @@ export function ReportView({
         <Metric label="Audited" value={report.summary.auditedPresences} tone="good" />
         <Metric label="Skipped" value={report.summary.skippedPresences} />
         <Metric
-          label="Sample Quality"
-          value={humanize(report.summary.sampleQuality)}
-          tone={
-            report.summary.sampleQuality === "strong_sample"
-              ? "good"
-              : report.summary.sampleQuality === "partial_sample" ||
-                  report.summary.sampleQuality === "weak_sample"
-                ? "warn"
-                : "neutral"
-          }
+          label="Market Confidence"
+          value={describeSampleQuality(report.summary.sampleQuality)}
+          tone={toneForSampleMetric(report.summary.sampleQuality)}
         />
         <Metric label="Shortlist" value={report.shortlist.length} tone="warn" />
       </MetricGrid>
@@ -289,7 +340,7 @@ export function ReportView({
           <div className="tag-row" style={{ marginBottom: "0.9rem" }}>
             <Tag tone="good">{describeProviderName(report.searchSource)}</Tag>
             <Tag tone={toneForSampleQuality(report.summary.sampleQuality)}>
-              {humanize(report.summary.sampleQuality)}
+              {describeSampleQuality(report.summary.sampleQuality)}
             </Tag>
             {report.intent.locationLabel ? <Tag>{report.intent.locationLabel}</Tag> : null}
             {report.intent.categories.map((category) => (
@@ -341,13 +392,26 @@ export function ReportView({
             </Tag>
             {report.acquisition.fallbackUsed ? <Tag tone="warn">Fallback Used</Tag> : null}
             <Tag tone={toneForSampleQuality(report.acquisition.sampleQuality)}>
-              {humanize(report.acquisition.sampleQuality)}
+              {describeSampleQuality(report.acquisition.sampleQuality)}
             </Tag>
           </div>
 
           <p className="muted" style={{ marginTop: 0, marginBottom: "0.9rem", lineHeight: 1.65 }}>
             {describeAcquisitionTrust(report)}
           </p>
+
+          <div className="sample-confidence-summary">
+            <div className="section-label">Market Confidence</div>
+            <p className="muted" style={{ margin: 0, lineHeight: 1.65 }}>
+              <strong>{describeSampleQuality(report.acquisition.sampleQuality)}.</strong>{" "}
+              {describeSampleQualityMeaning(report.acquisition.sampleQuality)}
+            </p>
+            <ul className="note-list">
+              {sampleConfidenceReasons.map((reason, index) => (
+                <li key={buildListKey("sample-confidence-reason", index)}>{reason}</li>
+              ))}
+            </ul>
+          </div>
 
           <p className="muted" style={{ marginTop: 0, lineHeight: 1.65 }}>
             Scout gathered <strong>{report.acquisition.rawCandidateCount}</strong> raw results,

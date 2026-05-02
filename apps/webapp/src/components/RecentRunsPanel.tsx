@@ -4,16 +4,7 @@ import { Panel, Tag } from "@scout/ui";
 
 import type { RecentRunSummary } from "@/lib/server/storage/run-repository";
 
-function humanizeSampleQuality(sampleQuality?: string): string {
-  if (!sampleQuality) {
-    return "In Progress";
-  }
-
-  return sampleQuality
-    .split("_")
-    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
-    .join(" ");
-}
+import { describeSampleQuality } from "./sample-quality-copy";
 
 function describeRunLink(status: RecentRunSummary["status"]): string {
   return status === "queued" || status === "running" ? "View progress" : "Open report";
@@ -61,7 +52,7 @@ export function RecentRunsPanel({
                     >
                       {run.status}
                     </Tag>
-                    <Tag>{humanizeSampleQuality(run.sampleQuality)}</Tag>
+                    <Tag>{describeSampleQuality(run.sampleQuality)}</Tag>
                   </div>
                   <div style={{ marginTop: "0.65rem" }}>
                     <Link className="inline-link" href={`/runs/${run.runId}`}>

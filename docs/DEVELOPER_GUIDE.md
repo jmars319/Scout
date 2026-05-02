@@ -22,7 +22,8 @@
 
 `pnpm run dev:all` starts the web app and worker together in one local shell session.
 `pnpm run dev:desktop` starts a local web server plus worker automatically, then opens the same Scout flow inside Electron.
-`pnpm run package:desktop` builds a macOS desktop release under `dist/desktop`.
+`pnpm run package:desktop` builds a local macOS desktop package under `dist/desktop` with ad-hoc signing when no Apple signing credentials are available.
+`pnpm run package:desktop:release` requires Developer ID signing and Apple notarization credentials, then builds release-ready macOS artifacts.
 `pnpm run install:desktop` packages Scout, installs `Scout by JAMARQ.app` into `~/Applications`, seeds the packaged desktop `.env` file if needed, and opens the installed app.
 `pnpm run launch:desktop` opens the installed Scout app from `~/Applications` or falls back to the packaged build under `dist/desktop`.
 `pnpm run clean:local` prunes the desktop interactive-search browser caches without clearing the saved session.
@@ -170,11 +171,16 @@ Desktop startup also prunes cache-heavy folders inside that profile at most once
 - `pnpm run verify:desktop`
   Typechecks the desktop package and verifies the Electron runtime entrypoint can boot and exit cleanly.
 - `pnpm run package:desktop`
-  Builds a packaged macOS release that bundles:
+  Builds a local macOS package that bundles:
   the production Next.js build
   a deployed webapp runtime with its own `node_modules`
   a bundled worker entrypoint
   the Playwright Chromium binaries used by Scout audits
+- `pnpm run package:desktop:release`
+  Runs a release preflight before packaging. The preflight requires a Developer ID signing identity through `CSC_LINK`, `CSC_NAME`, or the macOS keychain, and one notarization credential set:
+  `APPLE_API_KEY`/`APPLE_API_KEY_ID`/`APPLE_API_ISSUER`,
+  `APPLE_ID`/`APPLE_APP_SPECIFIC_PASSWORD`/`APPLE_TEAM_ID`,
+  or `APPLE_KEYCHAIN_PROFILE`.
 - `pnpm run install:desktop`
   Packages Scout, copies `Scout by JAMARQ.app` into `~/Applications`, seeds the packaged desktop env file, and opens the installed app.
 - `pnpm run launch:desktop`
@@ -195,3 +201,9 @@ Desktop stays intentionally thin. It does not introduce a second product workflo
   `Scout.app/Contents/Resources/scout.env`
 - `EVIDENCE_LOCAL_DIR` is set automatically for the packaged app to a user-data evidence folder, so screenshot storage stays outside the app bundle.
 - The packaged app also auto-prunes cache-heavy interactive-search folders on startup, but preserves the core browser profile so manual provider confirmation can continue working across runs.
+
+## macOS Release Distribution
+
+Use `pnpm run package:desktop` for local builds and internal smoke testing. It can produce working artifacts without Apple credentials, but those artifacts are ad-hoc signed and are not suitable for public distribution.
+
+Use `pnpm run package:desktop:release` when preparing a public macOS build. The script intentionally fails before the expensive packaging step unless Developer ID signing and notarization credentials are present. Electron Builder performs the notarization during packaging once those credentials are available.

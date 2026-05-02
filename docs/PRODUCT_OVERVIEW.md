@@ -60,7 +60,7 @@ Those opportunities become a shortlist the operator can act on.
 The report is intended to make operator judgment faster, not broader.
 
 - acquisition diagnostics explain how the candidate set was assembled, which provider attempts degraded, which sources supplied the kept sample, and whether fallback was involved
-- market sample quality is called out as strong, adequate, partial, or weak
+- market confidence is called out in operator-facing language and backed by concrete acquisition reasons
 - market summary explains the search space and the audit/skipped split
 - presence breakdown keeps non-owned, dead, blocked, and unknown presences visible
 - findings are normalized into stable issue types such as dead page, blocked content, missing contact path, missing primary CTA, accessibility issues, failed requests, and mobile layout issues

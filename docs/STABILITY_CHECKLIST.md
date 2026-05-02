@@ -18,6 +18,10 @@
 - `pnpm run verify:mobile`
 - `pnpm run doctor`
 
+## Release-Only Command
+
+- `pnpm run package:desktop:release`
+
 ## What They Guarantee
 
 - `check:env`
@@ -45,7 +49,9 @@
 - `verify:desktop`
   Confirms the desktop package typechecks and that Electron can launch Scout's desktop runtime entrypoint.
 - `package:desktop`
-  Confirms Scout can build a macOS desktop release with a bundled production web runtime, bundled worker entrypoint, and bundled Chromium assets.
+  Confirms Scout can build a local macOS desktop package with a bundled production web runtime, bundled worker entrypoint, and bundled Chromium assets.
+- `package:desktop:release`
+  Confirms the release environment has Developer ID signing and Apple notarization credentials before building. This command is expected to fail on machines that are only configured for local ad-hoc packages.
 - `verify:mobile`
   Confirms the remaining mobile scaffold does not break workspace integrity.
 - `doctor`

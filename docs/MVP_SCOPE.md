@@ -27,6 +27,8 @@
 - Market summary and shortlist report
 - Postgres-backed storage for structured run data
 - Local screenshot evidence storage
+- Postgres-backed queue lifecycle for local run execution
+- Desktop-first local outreach pack drafting and persistence
 
 ## Explicitly Out Of Scope For v1
 
@@ -37,13 +39,14 @@
 - AI-generated discovery
 - AI replacing deterministic checks
 - Heavy admin or dashboard surfaces
-- Queue-first orchestration
+- Fully self-contained local database packaging
+- Mobile runtime beyond scaffold verification
 
 ## Temporary Seams
 
-- Search provider fallback
-  A seeded fallback exists when live search cannot return enough candidates.
+- Search verification provider
+  A seeded provider exists for deterministic verification only. Normal product runs stay live-only and fail honestly when live acquisition returns no usable candidates.
 - Persistence
   Legacy local JSON runs remain import-compatible through `data/runs`, but Postgres is now the structured source of truth.
 - Queueing
-  The orchestration seam supports future background execution, but runs are synchronous today.
+  The current queue is intentionally simple and Postgres-backed. There is no Redis, BullMQ, or cloud worker system in v1.
