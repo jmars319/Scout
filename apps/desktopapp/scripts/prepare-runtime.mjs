@@ -43,6 +43,8 @@ async function trimDeployedWebRuntime() {
     "data/runs",
     "node_modules/@scout/webapp",
     "node_modules/.pnpm/node_modules/@scout/webapp",
+    "next-env.d.ts",
+    "tsconfig.json",
     "tsconfig.tsbuildinfo"
   ]) {
     await rm(path.resolve(webRuntimeDir, relativePath), {
