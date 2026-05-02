@@ -3,6 +3,7 @@ import {
   acquisitionFallbackTriggerReasons,
   acquisitionSourceKinds,
   auditIssueTypes,
+  candidateProvenanceKinds,
   confidenceLevels,
   findingSeverities,
   marketSampleQualities,
@@ -42,7 +43,10 @@ export const searchCandidateSchema = z.object({
   url: z.url(),
   domain: z.string(),
   snippet: z.string(),
-  source: z.string()
+  source: z.string(),
+  provenance: z.enum(candidateProvenanceKinds).optional(),
+  provenanceNote: z.string().optional(),
+  extractedFromCandidateId: z.string().optional()
 });
 
 export const acquisitionQueryVariantSchema = z.object({
@@ -85,7 +89,12 @@ export const acquisitionDuplicateRecordSchema = z.object({
 
 export const acquisitionDiscardRecordSchema = z.object({
   candidateId: z.string(),
-  reason: z.string()
+  reason: z.string(),
+  title: z.string().optional(),
+  url: z.url().optional(),
+  domain: z.string().optional(),
+  snippet: z.string().optional(),
+  source: z.string().optional()
 });
 
 export const acquisitionDiagnosticsSchema = z.object({

@@ -12,13 +12,13 @@ Scout is not a crawler, an SEO suite, or an AI-first app. The v1 product shape i
 - Search uses a narrow provider seam with hardened DuckDuckGo HTML, Google Search, and Bing HTML adapters. Live runs no longer backfill seeded candidates.
 - Completed runs can now save local outreach packs for shortlisted businesses, including contact-path recommendations, email drafts, short-form versions, and phone talking points, with optional OpenAI assistance grounded on stored Scout evidence.
 - Presence typing uses deterministic URL, domain, redirect, and basic destination-state rules before audit.
-- Acquisition now canonicalizes URLs, deduplicates across light query variants, and records sample-quality diagnostics.
+- Acquisition now canonicalizes URLs, deduplicates across controlled query variants, extracts lower-confidence directory-snippet leads, and records market-confidence diagnostics.
 - Runs are stored in Postgres through an explicit repository layer.
 - Run execution is queued in Postgres and processed by a dedicated worker process.
 - Existing local JSON runs in `data/runs` are treated as legacy import sources only.
 - Screenshot evidence is stored locally in `data/evidence`.
 - Audits are deterministic and use Playwright plus `@axe-core/playwright`.
-- Reports now distinguish audited vs skipped candidates, show confidence more clearly, and rank shortlist items with operator-facing reasons.
+- Reports now distinguish audited vs skipped candidates, show confidence more clearly, support operator-added/promoted candidates, and rank shortlist items with operator-facing reasons.
 - The homepage now shows recent Postgres-backed runs without adding a new dashboard surface.
 
 ## Monorepo Layout
@@ -74,6 +74,7 @@ scout/
 - `pnpm run typecheck`
 - `pnpm run verify:acquisition`
 - `pnpm run verify:providers`
+- `pnpm run verify:candidates`
 - `pnpm run verify:outreach`
 - `pnpm run verify:persistence`
 - `pnpm run verify:queue`

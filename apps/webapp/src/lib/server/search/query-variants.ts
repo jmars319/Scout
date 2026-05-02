@@ -65,6 +65,23 @@ export function buildQueryVariants(intent: ResolvedMarketIntent): SearchQueryVar
     });
   }
 
+  if (intent.locationLabel) {
+    variants.push(
+      {
+        label: "official_website",
+        query: normalizeWhitespace(`"${intent.marketTerm}" "${intent.locationLabel}" "official website"`)
+      },
+      {
+        label: "contact_path",
+        query: normalizeWhitespace(`"${intent.marketTerm}" "${intent.locationLabel}" contact`)
+      },
+      {
+        label: "owned_domain",
+        query: normalizeWhitespace(`site:*.com "${intent.marketTerm}" "${intent.locationLabel}"`)
+      }
+    );
+  }
+
   const seen = new Set<string>();
 
   return variants.filter((variant) => {

@@ -29,6 +29,8 @@
 - Local screenshot evidence storage
 - Postgres-backed queue lifecycle for local run execution
 - Desktop-first local outreach pack drafting and persistence
+- Operator-added and promoted candidates on completed reports
+- Lower-confidence directory-snippet lead extraction
 
 ## Explicitly Out Of Scope For v1
 
@@ -41,6 +43,7 @@
 - Heavy admin or dashboard surfaces
 - Fully self-contained local database packaging
 - Mobile runtime beyond scaffold verification
+- Fully automated lead enrichment from directories
 
 ## Temporary Seams
 

@@ -50,11 +50,13 @@
 - Default provider path: DuckDuckGo HTML scrape, Google Search, and Bing HTML on the same live seam.
 - Verification-only provider: seeded deterministic catalog.
 - Provider seam: explicit adapters return candidates plus structured attempt diagnostics.
-- Query acquisition uses a very small deterministic variant set:
+- Query acquisition uses a controlled deterministic variant set:
   raw query
   normalized market plus location form
   singularized variant only when it is safely derivable
+  official-website/contact/domain-oriented variants when a location is present
 - URLs are canonicalized before final candidate selection.
+- Directory and profile snippets can surface lower-confidence extracted leads when Scout sees a business name inside a non-owned result.
 - Candidates are deduplicated before presence typing and audit.
 - Domain logic never hardcodes provider-specific assumptions.
 - Live-provider degradation is classified explicitly when Scout sees:
@@ -71,8 +73,16 @@
   verification-only fallback trigger reasons
   caution notes tied to live-provider weakness
 
-If live acquisition is weak, partial, or fallback-heavy, Scout records that in acquisition diagnostics and sample-quality notes.
+If live acquisition is weak, partial, fallback-heavy, or directory-snippet-heavy, Scout records that in acquisition diagnostics and market-confidence notes.
 If a desktop DuckDuckGo run needs manual confirmation, Scout records that too.
+
+## Candidate Review
+
+- Completed reports include an acquisition review panel.
+- Operators can manually add a known business by name and URL after the run.
+- Operators can promote discarded acquisition results when Scout saved enough detail to reconstruct the candidate.
+- Added and promoted candidates are evaluated through the same presence detection, Playwright audit, business classification, and shortlist rules as live-search candidates.
+- Provenance labels distinguish live results, directory-snippet leads, manual additions, and promoted discarded results.
 
 ## Audit Behavior
 
@@ -140,6 +150,8 @@ Run storage and evidence storage both live behind explicit adapters. The worker 
   Runs a small deterministic check over canonicalization, query variants, deduplication, and live-only acquisition behavior.
 - `pnpm run verify:providers`
   Verifies the hardened provider seam directly: DuckDuckGo HTML, Google Search, and Bing parsing success, empty-result detection, block/degradation detection, parse-failure detection, and fallback-trigger diagnostics under degraded live acquisition.
+- `pnpm run verify:candidates`
+  Seeds a completed run with a promotable discarded candidate, adds a manual candidate, promotes the discarded candidate, verifies the report summary is rebuilt, and cleans up the verification row plus local evidence.
 - `pnpm run verify:outreach`
   Seeds a completed verification run, lets Scout analyze a local contact-path fixture, saves a local outreach pack through the desktop-first outreach service layer, reads it back from Postgres, and then cleans up the verification records.
 - `pnpm run verify:persistence`
@@ -149,7 +161,7 @@ Run storage and evidence storage both live behind explicit adapters. The worker 
 - `pnpm run verify:http-smoke`
   Starts a temporary Next.js dev server plus a one-shot worker on an isolated local port, warms the real API routes, submits a run through `POST /api/scout/run`, confirms the queued response, waits for `queued -> running -> completed`, retrieves the final report through `GET /api/runs/:runId`, and deletes the verification row plus local evidence.
 - `pnpm run verify:web`
-  Runs lint, typecheck, acquisition verification, persistence verification, queue verification, and the web build.
+  Runs lint, typecheck, acquisition verification, provider verification, candidate-addition verification, persistence verification, queue verification, and the web build.
 
 `verify:http-smoke` requires `DATABASE_URL`, local Postgres access, and the Playwright browser installed by `pnpm run bootstrap`. It intentionally forces `SCOUT_SEARCH_PROVIDER=seeded_stub` and smaller candidate limits inside the temporary child processes so the smoke path proves HTTP lifecycle integrity without depending on live-provider stability. That stub path is verification-only; normal Scout runs no longer backfill seeded candidates.
 

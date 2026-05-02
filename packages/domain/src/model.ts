@@ -63,6 +63,12 @@ export const acquisitionAttemptOutcomes = [
   "http_error"
 ] as const;
 export const acquisitionSourceKinds = ["live", "fallback"] as const;
+export const candidateProvenanceKinds = [
+  "live_search_result",
+  "directory_snippet",
+  "manual",
+  "promoted_discarded"
+] as const;
 export const acquisitionFallbackTriggerReasons = [
   "fallback_only_mode",
   "insufficient_live_candidates",
@@ -102,6 +108,7 @@ export type AuditIssueType = (typeof auditIssueTypes)[number];
 export type MarketSampleQuality = (typeof marketSampleQualities)[number];
 export type AcquisitionAttemptOutcome = (typeof acquisitionAttemptOutcomes)[number];
 export type AcquisitionSourceKind = (typeof acquisitionSourceKinds)[number];
+export type CandidateProvenanceKind = (typeof candidateProvenanceKinds)[number];
 export type AcquisitionFallbackTriggerReason = (typeof acquisitionFallbackTriggerReasons)[number];
 
 export interface ScoutQueryInput {
@@ -127,6 +134,9 @@ export interface SearchCandidate {
   domain: string;
   snippet: string;
   source: string;
+  provenance?: CandidateProvenanceKind | undefined;
+  provenanceNote?: string | undefined;
+  extractedFromCandidateId?: string | undefined;
 }
 
 export interface AcquisitionQueryVariant {
@@ -146,6 +156,11 @@ export interface AcquisitionDuplicateRecord {
 export interface AcquisitionDiscardRecord {
   candidateId: string;
   reason: string;
+  title?: string | undefined;
+  url?: string | undefined;
+  domain?: string | undefined;
+  snippet?: string | undefined;
+  source?: string | undefined;
 }
 
 export interface AcquisitionProviderAttempt {

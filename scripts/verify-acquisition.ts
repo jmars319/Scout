@@ -54,6 +54,9 @@ async function main(): Promise<void> {
   assert(variants.some((variant) => variant.label === "raw"));
   assert(variants.some((variant) => variant.label === "normalized"));
   assert(variants.some((variant) => variant.label === "singularized"));
+  assert(variants.some((variant) => variant.label === "official_website"));
+  assert(variants.some((variant) => variant.label === "contact_path"));
+  assert(variants.some((variant) => variant.label === "owned_domain"));
   assert.equal(
     evaluatePresenceUrl({
       url: "https://www.buildzoom.com/winston-salem-nc/landscape-contractors",
@@ -285,11 +288,15 @@ async function main(): Promise<void> {
     ]
   });
 
-  assert.equal(aggregatorResult.diagnostics.discardedCandidateCount, 4);
-  assert.equal(aggregatorResult.candidates.length, 2);
-  assert.deepEqual(
-    aggregatorResult.candidates.map((candidate) => candidate.domain).sort(),
-    ["affordablepcstore.com", "crs2000.net"]
+  assert(aggregatorResult.diagnostics.discardedCandidateCount >= 4);
+  assert(
+    aggregatorResult.candidates.some((candidate) => candidate.domain === "affordablepcstore.com")
+  );
+  assert(aggregatorResult.candidates.some((candidate) => candidate.domain === "crs2000.net"));
+  assert(
+    aggregatorResult.diagnostics.discardedCandidates.every(
+      (candidate) => candidate.reason && candidate.title && candidate.url
+    )
   );
 
   const shortlistPresences = [

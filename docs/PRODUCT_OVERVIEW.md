@@ -33,7 +33,7 @@ The run is now executed asynchronously:
 
 - Search is provider-based.
 - The live provider seam is intentionally narrow and explicit: Scout isolates provider mechanics, attempt outcomes, and fallback triggers from domain logic.
-- Search acquisition uses light query variants, URL canonicalization, and explicit deduplication before presence typing.
+- Search acquisition uses controlled query variants, URL canonicalization, directory-snippet extraction, and explicit deduplication before presence typing.
 - Presence typing happens before audit.
 - Presence typing uses URL, domain, redirect, and destination-state rules to reduce false owned-site calls.
 - Audits are browser-based and rule-based.
@@ -65,4 +65,5 @@ The report is intended to make operator judgment faster, not broader.
 - presence breakdown keeps non-owned, dead, blocked, and unknown presences visible
 - findings are normalized into stable issue types such as dead page, blocked content, missing contact path, missing primary CTA, accessibility issues, failed requests, and mobile layout issues
 - shortlist entries explain why the business matters, not only what broke
+- operator-added and promoted candidates are evaluated through the same presence, audit, classification, and shortlist rules while retaining their provenance labels
 - structured run retrieval and queue state are Postgres-backed, while screenshot evidence remains local

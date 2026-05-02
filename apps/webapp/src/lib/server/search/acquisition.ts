@@ -10,6 +10,7 @@ import type {
   AcquisitionDuplicateRecord,
   AcquisitionFallbackTrigger,
   AcquisitionSourceCount,
+  CandidateProvenanceKind,
   MarketSampleQuality,
   ResolvedMarketIntent,
   ScoutAcquisitionResult,
@@ -44,6 +45,9 @@ interface RawAcquisitionCandidate extends ProviderSearchCandidate {
   comparisonKey: string;
   businessKey: string;
   presenceHint: ReturnType<typeof evaluatePresenceUrl>["type"];
+  provenance: CandidateProvenanceKind;
+  provenanceNote?: string;
+  extractedFromCandidateId?: string;
 }
 
 interface VariantAccumulator {
@@ -59,7 +63,7 @@ function shouldQueryProviderVariant(
   variantLabel: string
 ): boolean {
   if (provider.name === "bing_html" || provider.name === "google_html") {
-    return variantLabel === "raw";
+    return variantLabel === "raw" || variantLabel === "official_website";
   }
 
   return true;
@@ -128,12 +132,30 @@ function getDiscardReason(candidate: RawAcquisitionCandidate): string | null {
   return null;
 }
 
+function buildDiscardRecord(
+  candidate: RawAcquisitionCandidate,
+  reason: string
+): AcquisitionDiscardRecord {
+  return {
+    candidateId: candidate.candidateId,
+    reason,
+    title: candidate.title,
+    url: candidate.canonicalUrl,
+    domain: candidate.canonicalHost,
+    snippet: candidate.snippet,
+    source: candidate.source
+  };
+}
+
 function buildRawCandidate(
   input: ProviderSearchCandidate,
   index: number,
   acquisitionKind: "live" | "fallback",
   acquisitionQuery: string,
-  variantLabel: string
+  variantLabel: string,
+  provenance: CandidateProvenanceKind = "live_search_result",
+  provenanceNote?: string,
+  extractedFromCandidateId?: string
 ): RawAcquisitionCandidate {
   const canonical = canonicalizeUrl(input.url);
   const businessKey = buildBusinessKey(input.title) || canonical.canonicalHost;
@@ -153,13 +175,94 @@ function buildRawCandidate(
       url: canonical.canonicalUrl,
       title: input.title,
       snippet: input.snippet
-    }).type
+    }).type,
+    provenance,
+    ...(provenanceNote ? { provenanceNote } : {}),
+    ...(extractedFromCandidateId ? { extractedFromCandidateId } : {})
   };
+}
+
+function isDirectorySnippetSource(candidate: RawAcquisitionCandidate): boolean {
+  return (
+    candidate.presenceHint === "directory_only" ||
+    candidate.presenceHint === "marketplace" ||
+    candidate.presenceHint === "yelp_only"
+  );
+}
+
+function cleanupExtractedBusinessName(value: string): string {
+  return value
+    .replace(/\s+/g, " ")
+    .replace(/^[^a-z0-9]+/i, "")
+    .replace(/\s+(is|are|provides?|offers?|located|serves?|specializes?)\b.*$/i, "")
+    .replace(/\s+-\s+.*$/i, "")
+    .replace(/\s+\|\s+.*$/i, "")
+    .trim();
+}
+
+function extractBusinessNamesFromSnippet(candidate: RawAcquisitionCandidate): string[] {
+  if (!isDirectorySnippetSource(candidate)) {
+    return [];
+  }
+
+  const snippets = candidate.snippet
+    .split(/(?<=[.!?])\s+|\n+/)
+    .map(cleanupExtractedBusinessName)
+    .filter((part) => part.length >= 4 && part.length <= 90);
+  const candidates: string[] = [];
+
+  for (const part of snippets) {
+    const match = part.match(
+      /^([A-Z0-9][A-Za-z0-9&'., ]{2,70}?)(?:\s+(?:is|are|provides?|offers?|located|serves?|specializes?)\b|$)/
+    );
+    const extracted = cleanupExtractedBusinessName(match?.[1] ?? part);
+    if (
+      extracted &&
+      /[a-z]/i.test(extracted) &&
+      !/\b(best|near|reviews?|directions?|results?|search|category|undefined)\b/i.test(extracted) &&
+      !titlesLookEquivalent(extracted, candidate.title)
+    ) {
+      candidates.push(extracted);
+    }
+  }
+
+  return [...new Set(candidates)].slice(0, 2);
+}
+
+function buildDirectorySnippetCandidates(
+  sourceCandidate: RawAcquisitionCandidate,
+  startIndex: number
+): RawAcquisitionCandidate[] {
+  return extractBusinessNamesFromSnippet(sourceCandidate).map((businessName, index) =>
+    buildRawCandidate(
+      {
+        title: businessName,
+        url: sourceCandidate.canonicalUrl,
+        snippet: sourceCandidate.snippet,
+        source: `${sourceCandidate.source}_directory_snippet`
+      },
+      startIndex + index,
+      sourceCandidate.acquisitionKind,
+      sourceCandidate.acquisitionQuery,
+      "directory_snippet",
+      "directory_snippet",
+      `Extracted from a ${describeProviderSource(sourceCandidate.source)} directory/profile snippet. Verify before treating as an owned web presence.`,
+      sourceCandidate.candidateId
+    )
+  );
+}
+
+function describeProviderSource(source: string): string {
+  return source.replace(/_/g, " ");
 }
 
 function getPreferenceScore(candidate: RawAcquisitionCandidate): number {
   let score = candidate.acquisitionKind === "live" ? 100 : 0;
   score += Math.max(0, 18 - candidate.rawRank);
+
+  if (candidate.provenance === "directory_snippet") {
+    score -= 8;
+  }
 
   if (candidate.presenceHint === "owned_website") {
     score += 30;
@@ -191,6 +294,13 @@ function getDuplicateReason(
   right: RawAcquisitionCandidate
 ): string | null {
   if (left.comparisonKey === right.comparisonKey) {
+    if (
+      (left.provenance === "directory_snippet" || right.provenance === "directory_snippet") &&
+      left.businessKey !== right.businessKey
+    ) {
+      return null;
+    }
+
     return "Same canonical URL after normalization.";
   }
 
@@ -330,6 +440,16 @@ function determineSampleQuality(input: {
   const providerDegraded = input.providerAttempts.some(
     (attempt) => attempt.kind === "live" && isProviderDegraded(attempt.outcome)
   );
+  const successfulLiveProviderCount = new Set(
+    input.providerAttempts
+      .filter((attempt) => attempt.kind === "live" && attempt.outcome === "success")
+      .map((attempt) => attempt.provider)
+  ).size;
+  const degradationShouldLimitConfidence =
+    providerDegraded &&
+    (successfulLiveProviderCount === 0 ||
+      selectedCount < input.limits.minCandidates + 2 ||
+      lowSignalRatio > 0.35);
 
   if (
     selectedCount < Math.ceil(input.limits.minCandidates / 2) ||
@@ -345,7 +465,7 @@ function determineSampleQuality(input: {
     liveCount / Math.max(selectedCount, 1) < 0.5 ||
     fallbackRatio >= 0.4 ||
     lowSignalRatio >= 0.5 ||
-    providerDegraded
+    degradationShouldLimitConfidence
   ) {
     return "partial_sample";
   }
@@ -354,6 +474,7 @@ function determineSampleQuality(input: {
     selectedCount >= Math.min(input.limits.maxCandidates, input.limits.minCandidates + 2) &&
     liveCount / selectedCount >= 0.75 &&
     fallbackCount === 0 &&
+    !providerDegraded &&
     lowSignalRatio <= 0.35 &&
     input.notes.length <= 1
   ) {
@@ -420,6 +541,9 @@ function buildDiagnosticsNotes(input: {
   ).length;
   const lowSignalCount = input.selected.filter((candidate) =>
     isLowSignalPresence(candidate.presenceHint)
+  ).length;
+  const directorySnippetCount = input.selected.filter(
+    (candidate) => candidate.provenance === "directory_snippet"
   ).length;
 
   if (!input.intent.locationLabel) {
@@ -505,6 +629,12 @@ function buildDiagnosticsNotes(input: {
     notes.push("The final sample still leans heavily on directory, marketplace, or profile-style presences.");
   }
 
+  if (directorySnippetCount > 0) {
+    notes.push(
+      `${directorySnippetCount} kept candidate(s) were extracted from directory/profile snippets and should be treated as lower-confidence until Scout finds a direct owned presence.`
+    );
+  }
+
   if (input.mergedCount >= Math.max(3, Math.floor(input.rawCandidateCount * 0.2))) {
     notes.push("Multiple overlapping candidates were merged across query variants before final selection.");
   }
@@ -520,7 +650,12 @@ function toSearchCandidate(candidate: RawAcquisitionCandidate, rank: number): Se
     url: candidate.canonicalUrl,
     domain: candidate.canonicalHost,
     snippet: candidate.snippet,
-    source: candidate.source
+    source: candidate.source,
+    provenance: candidate.provenance,
+    ...(candidate.provenanceNote ? { provenanceNote: candidate.provenanceNote } : {}),
+    ...(candidate.extractedFromCandidateId
+      ? { extractedFromCandidateId: candidate.extractedFromCandidateId }
+      : {})
   };
 }
 
@@ -634,15 +769,38 @@ export async function acquireCandidates(input: {
     }
   }
 
+  const snippetStat = ensureVariantAccumulator(
+    variantStats,
+    "directory_snippet",
+    "extracted from directory/profile snippets"
+  );
+  const directorySnippetCandidates: RawAcquisitionCandidate[] = [];
+
+  for (const candidate of rawCandidates) {
+    const extracted = buildDirectorySnippetCandidates(
+      candidate,
+      rawSequence + directorySnippetCandidates.length
+    );
+    if (extracted.length === 0) {
+      continue;
+    }
+
+    snippetStat.sources.add(`${candidate.source}_directory_snippet`);
+    directorySnippetCandidates.push(...extracted);
+  }
+
+  if (directorySnippetCandidates.length > 0) {
+    rawCandidates.push(...directorySnippetCandidates);
+    snippetStat.rawResultCount += directorySnippetCandidates.length;
+    rawSequence += directorySnippetCandidates.length;
+  }
+
   const uniqueCandidates: RawAcquisitionCandidate[] = [];
 
   for (const candidate of rawCandidates) {
     const discardReason = getDiscardReason(candidate);
     if (discardReason) {
-      discardedCandidates.push({
-        candidateId: candidate.candidateId,
-        reason: discardReason
-      });
+      discardedCandidates.push(buildDiscardRecord(candidate, discardReason));
       continue;
     }
 
@@ -710,10 +868,7 @@ export async function acquireCandidates(input: {
       rawCandidates.push(candidate);
       const discardReason = getDiscardReason(candidate);
       if (discardReason) {
-        discardedCandidates.push({
-          candidateId: candidate.candidateId,
-          reason: discardReason
-        });
+        discardedCandidates.push(buildDiscardRecord(candidate, discardReason));
         continue;
       }
 

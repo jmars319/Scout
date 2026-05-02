@@ -374,6 +374,51 @@ summary {
   min-width: 0;
 }
 
+.candidate-review,
+.candidate-review-form,
+.candidate-review-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.9rem;
+  min-width: 0;
+}
+
+.candidate-review-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 0.65rem;
+  align-items: end;
+  min-width: 0;
+}
+
+.candidate-review-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.candidate-review-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1rem;
+  align-items: start;
+  padding: 0.8rem 0;
+  border-top: 1px solid var(--line);
+  min-width: 0;
+}
+
+.candidate-review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+button[disabled] {
+  opacity: 0.68;
+  cursor: wait;
+}
+
 .note-list {
   margin: 0;
   padding-left: 1rem;
@@ -382,6 +427,17 @@ summary {
   min-width: 0;
   overflow-wrap: anywhere;
   word-break: break-word;
+}
+
+@media (max-width: 820px) {
+  .candidate-review-fields,
+  .candidate-review-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .candidate-review-actions {
+    justify-content: flex-start;
+  }
 }
 
 .finding-table {

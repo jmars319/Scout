@@ -9,6 +9,7 @@ import type {
 } from "@scout/domain";
 import { Metric, MetricGrid, Panel, Tag } from "@scout/ui";
 
+import { CandidateReviewPanel } from "./CandidateReviewPanel";
 import { OutreachWorkspace } from "./OutreachWorkspace";
 import {
   describeSampleQuality,
@@ -63,6 +64,22 @@ function describeQueryVariantLabel(label: string): string {
     return "Singular";
   }
 
+  if (label === "official_website") {
+    return "Official Site";
+  }
+
+  if (label === "contact_path") {
+    return "Contact Path";
+  }
+
+  if (label === "owned_domain") {
+    return "Owned Domain";
+  }
+
+  if (label === "directory_snippet") {
+    return "Snippet Leads";
+  }
+
   return humanize(label);
 }
 
@@ -84,6 +101,22 @@ function describeAttemptOutcome(outcome: string): string {
   }
 
   return humanize(outcome);
+}
+
+function describeCandidateProvenance(value?: string): string {
+  if (value === "directory_snippet") {
+    return "Directory snippet";
+  }
+
+  if (value === "manual") {
+    return "Manual add";
+  }
+
+  if (value === "promoted_discarded") {
+    return "Promoted result";
+  }
+
+  return "Live result";
 }
 
 function toneForQuality(quality: string): "neutral" | "good" | "warn" | "danger" {
@@ -310,6 +343,7 @@ export function ReportView({
     (attempt) => attempt.kind === "live" && attempt.outcome !== "success"
   );
   const sampleConfidenceReasons = buildSampleConfidenceReasons(report);
+  const candidatesById = new Map(report.candidates.map((candidate) => [candidate.candidateId, candidate]));
 
   return (
     <div className="scout-shell">
@@ -557,6 +591,18 @@ export function ReportView({
         </Panel>
       </div>
 
+      {report.status === "completed" ? (
+        <Panel
+          title="Acquisition Review"
+          description="Add a known business or promote a discarded acquisition result. Scout will run the same presence, audit, classification, and shortlist rules against the added candidate."
+        >
+          <CandidateReviewPanel
+            discardedCandidates={report.acquisition.discardedCandidates}
+            runId={report.runId}
+          />
+        </Panel>
+      ) : null}
+
       <Panel
         title="Shortlist"
         description="Highest-priority business opportunities ranked from Scout's deterministic presence and audit rules. Directory and marketplace pages stay below in the full market picture."
@@ -583,6 +629,7 @@ export function ReportView({
                   <Tag tone={toneForConfidence(lead.confidence)}>
                     {humanize(lead.confidence)}
                   </Tag>
+                  <Tag>{describeCandidateProvenance(candidatesById.get(lead.candidateId)?.provenance)}</Tag>
                   {lead.opportunityTypes.map((opportunity) => (
                     <Tag key={opportunity} tone="good">
                       {humanize(opportunity)}
@@ -632,6 +679,7 @@ export function ReportView({
               findingsByCandidate.get(business.candidateId) ?? []
             );
             const evidence = candidateFindings.filter((finding) => finding.screenshotUrl).slice(0, 2);
+            const candidate = candidatesById.get(business.candidateId);
 
             return (
               <li key={business.candidateId} className="report-card">
@@ -654,8 +702,15 @@ export function ReportView({
                     <Tag tone={toneForAuditStatus(business.auditStatus)}>
                       {humanize(business.auditStatus)}
                     </Tag>
+                    <Tag>{describeCandidateProvenance(candidate?.provenance)}</Tag>
                   </div>
                 </header>
+
+                {candidate?.provenanceNote ? (
+                  <p className="muted" style={{ margin: 0, lineHeight: 1.55 }}>
+                    {candidate.provenanceNote}
+                  </p>
+                ) : null}
 
                 <div className="tag-row">
                   <Tag>{business.findingCount} finding(s)</Tag>
