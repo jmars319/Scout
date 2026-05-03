@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -16,10 +17,18 @@ function resolveSchemaPath(): string {
     return process.env.SCOUT_SCHEMA_PATH.trim();
   }
 
-  return path.resolve(
-    process.env.SCOUT_RUNTIME_ROOT?.trim() || process.cwd(),
-    "scripts/sql/001_create_scout_runs.sql"
+  const roots = [process.cwd(), path.resolve(process.cwd(), "../..")];
+  const runtimeRoot = process.env.SCOUT_RUNTIME_ROOT?.trim();
+
+  if (runtimeRoot) {
+    roots.unshift(runtimeRoot);
+  }
+
+  const candidates = roots.map((root) =>
+    path.resolve(root, "scripts/sql/001_create_scout_runs.sql")
   );
+
+  return candidates.find((candidate) => existsSync(candidate)) ?? candidates[0]!;
 }
 
 async function applySchema(schemaPath: string): Promise<void> {
