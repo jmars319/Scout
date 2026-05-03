@@ -9,9 +9,11 @@
 - `pnpm run db:prepare`
 - `pnpm run verify:providers`
 - `pnpm run verify:candidates`
+- `pnpm run verify:comparison`
 - `pnpm run verify:outreach`
 - `pnpm run verify:persistence`
 - `pnpm run verify:queue`
+- `pnpm run verify:run-controls`
 - `pnpm run verify:http-smoke`
 - `pnpm run build:web`
 - `pnpm run verify:desktop`
@@ -38,13 +40,17 @@
 - `verify:providers`
   Confirms the live-provider seam classifies success, empty-result pages, provider degradation, parse failure, and manual-confirmation diagnostics deterministically.
 - `verify:candidates`
-  Confirms completed reports can accept a manual candidate, promote a saved discarded result, rerun candidate evaluation, rebuild summaries, and clean up verification evidence.
+  Confirms completed reports can accept a manual candidate, retain missed-business diagnostics as acquisition-learning notes, promote a saved discarded result, rerun candidate evaluation, rebuild summaries, and clean up verification evidence.
+- `verify:comparison`
+  Confirms saved-market comparison logic for new/missing businesses, shortlist rank movement, finding deltas, issue deltas, and sample metadata.
 - `verify:outreach`
   Confirms Scout can persist a local outreach draft against a completed run and retrieve it back through the outreach workspace seam.
 - `verify:persistence`
   Confirms Postgres connectivity, schema readiness, run write/read behavior, and recent-run retrieval.
 - `verify:queue`
   Confirms queued run creation, worker claim behavior, lifecycle transitions, and failure-note persistence.
+- `verify:run-controls`
+  Confirms submitted run records can be canceled, retried in place, re-queued after a stale worker, and rerun as a fresh queued run.
 - `verify:http-smoke`
   Confirms the real HTTP submit and retrieval path: the web server returns a queued response promptly, a worker picks the run up, lifecycle state moves through `queued -> running -> completed`, the final persisted report is retrievable from the real API, lead inbox/detail/export flows render over HTTP, and run cancel/retry/re-run controls work through the API.
 - `verify:ui-smoke`

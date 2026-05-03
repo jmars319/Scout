@@ -6,7 +6,17 @@ import { LeadInbox } from "@/components/LeadInbox";
 import { LeadPipelineBoard } from "@/components/LeadPipelineBoard";
 import { ScoutNavigation } from "@/components/ScoutNavigation";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { listLeadInboxItems } from "@/lib/server/leads/lead-inbox-service";
+import {
+  listLeadInboxItems,
+  normalizeLeadInboxFilter
+} from "@/lib/server/leads/lead-inbox-service";
+
+interface LeadsPageProps {
+  searchParams?: Promise<{
+    filter?: string | string[] | undefined;
+    q?: string | string[] | undefined;
+  }>;
+}
 
 export const dynamic = "force-dynamic";
 
@@ -14,9 +24,18 @@ function isClosed(state: string): boolean {
   return state === "dismissed" || state === "not_a_fit";
 }
 
-export default async function LeadsPage() {
+function firstParam(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+export default async function LeadsPage({ searchParams }: LeadsPageProps) {
+  const params = (await searchParams) ?? {};
+  const filterParam = firstParam(params.filter);
+  const queryParam = firstParam(params.q);
   const items = await listLeadInboxItems(500);
   const today = new Date().toISOString().slice(0, 10);
+  const initialFilter = filterParam ? normalizeLeadInboxFilter(filterParam) : undefined;
+  const initialSearch = queryParam?.trim() ?? "";
   const dueCount = items.filter(
     (item) =>
       item.annotation.followUpDate &&
@@ -57,7 +76,12 @@ export default async function LeadsPage() {
         </Panel>
 
         <Panel title="Lead Inbox">
-          <LeadInbox initialItems={items} today={today} />
+          <LeadInbox
+            initialFilter={initialFilter}
+            initialItems={items}
+            initialSearch={initialSearch}
+            today={today}
+          />
         </Panel>
       </div>
     </AppFrame>

@@ -83,6 +83,7 @@ If a desktop DuckDuckGo run needs manual confirmation, Scout records that too.
 - Operators can promote discarded acquisition results when Scout saved enough detail to reconstruct the candidate.
 - Added and promoted candidates are evaluated through the same presence detection, Playwright audit, business classification, and shortlist rules as live-search candidates.
 - Provenance labels distinguish live results, directory-snippet leads, manual additions, and promoted discarded results.
+- Manual missed-business additions also append acquisition-learning notes so future review can distinguish provider/query coverage gaps, discarded-result filtering, duplicate handling, degraded live search, and narrow samples.
 
 ## Audit Behavior
 
@@ -152,17 +153,21 @@ Run storage and evidence storage both live behind explicit adapters. The worker 
 - `pnpm run verify:providers`
   Verifies the hardened provider seam directly: DuckDuckGo HTML, Google Search, and Bing parsing success, empty-result detection, block/degradation detection, parse-failure detection, and fallback-trigger diagnostics under degraded live acquisition.
 - `pnpm run verify:candidates`
-  Seeds a completed run with a promotable discarded candidate, adds a manual candidate, promotes the discarded candidate, verifies the report summary is rebuilt, and cleans up the verification row plus local evidence.
+  Seeds a completed run with a promotable discarded candidate, adds a manual candidate, verifies missed-business diagnostics plus acquisition-learning notes, promotes the discarded candidate, verifies the report summary is rebuilt, and cleans up the verification row plus local evidence.
+- `pnpm run verify:comparison`
+  Builds two deterministic completed report fixtures and verifies saved-market comparison output for new/missing businesses, shortlist rank movement, finding deltas, issue deltas, and sample metadata.
 - `pnpm run verify:outreach`
   Seeds a completed verification run, lets Scout analyze a local contact-path fixture, saves a local outreach pack through the desktop-first outreach service layer, reads it back from Postgres, and then cleans up the verification records.
 - `pnpm run verify:persistence`
   Applies the schema, creates a queued run record, saves a completed run record, reads it back, checks recent-run retrieval, and deletes the verification row.
 - `pnpm run verify:queue`
   Applies the schema, creates queued runs, verifies worker claim behavior, verifies completed and failed lifecycle transitions, and deletes the verification rows.
+- `pnpm run verify:run-controls`
+  Applies the schema, submits a queued run, verifies cancel, retry, stale-run requeue, and fresh rerun behavior, then deletes the verification rows.
 - `pnpm run verify:http-smoke`
   Starts a temporary Next.js dev server plus a one-shot worker on an isolated local port, warms the real API routes, submits a run through `POST /api/scout/run`, confirms the queued response, waits for `queued -> running -> completed`, retrieves the final report through `GET /api/runs/:runId`, verifies lead UI/export paths plus run control actions, and deletes the verification rows plus local evidence.
 - `pnpm run verify:web`
-  Runs lint, typecheck, acquisition verification, provider verification, candidate-addition verification, persistence verification, queue verification, and the web build.
+  Runs lint, typecheck, acquisition verification, provider verification, candidate-addition verification, market-comparison verification, lead/outreach verification, persistence verification, queue verification, run-control verification, and the web build.
 
 `verify:http-smoke` requires `DATABASE_URL`, local Postgres access, and the Playwright browser installed by `pnpm run bootstrap`. It intentionally forces `SCOUT_SEARCH_PROVIDER=seeded_stub` and smaller candidate limits inside the temporary child processes so the smoke path proves HTTP lifecycle integrity without depending on live-provider stability. That stub path is verification-only; normal Scout runs no longer backfill seeded candidates.
 

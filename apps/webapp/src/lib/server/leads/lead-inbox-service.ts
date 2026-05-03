@@ -9,7 +9,15 @@ import { createLeadAnnotationRepository } from "../storage/lead-annotation-repos
 import type { LeadAnnotationRunRecord } from "../storage/lead-annotation-repository.ts";
 import { createOutreachDraftRepository } from "../storage/outreach-draft-repository.ts";
 
-export type LeadInboxFilter = "all" | "open" | "saved" | "contacted" | "closed" | "due";
+export type LeadInboxFilter =
+  | "all"
+  | "open"
+  | "needs_draft"
+  | "ready"
+  | "saved"
+  | "contacted"
+  | "closed"
+  | "due";
 
 export interface LeadInboxFilters {
   filter?: LeadInboxFilter | undefined;
@@ -30,6 +38,18 @@ function isDue(item: LeadInboxItem, today: string): boolean {
     item.annotation.followUpDate &&
       item.annotation.followUpDate <= today &&
       !isClosed(item.annotation.state)
+  );
+}
+
+function isReady(item: LeadInboxItem): boolean {
+  return item.outreach.status === "draft_ready" || item.outreach.status === "edited_saved";
+}
+
+function needsDraft(item: LeadInboxItem): boolean {
+  return (
+    !isClosed(item.annotation.state) &&
+    item.annotation.state !== "contacted" &&
+    !isReady(item)
   );
 }
 
@@ -117,6 +137,18 @@ function matchesFilter(item: LeadInboxItem, filter: LeadInboxFilter, today: stri
     return item.annotation.state === "needs_review";
   }
 
+  if (filter === "needs_draft") {
+    return needsDraft(item);
+  }
+
+  if (filter === "ready") {
+    return (
+      !isClosed(item.annotation.state) &&
+      item.annotation.state !== "contacted" &&
+      isReady(item)
+    );
+  }
+
   if (filter === "closed") {
     return isClosed(item.annotation.state);
   }
@@ -155,6 +187,8 @@ function resolveToday(value: string | undefined): string {
 export function normalizeLeadInboxFilter(value: string | null | undefined): LeadInboxFilter {
   if (
     value === "open" ||
+    value === "needs_draft" ||
+    value === "ready" ||
     value === "saved" ||
     value === "contacted" ||
     value === "closed" ||

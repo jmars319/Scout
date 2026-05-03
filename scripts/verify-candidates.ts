@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import assert from "node:assert/strict";
 import { rm } from "node:fs/promises";
 import path from "node:path";
 
@@ -122,12 +123,27 @@ try {
   const withManual = await addManualCandidateToRun({
     runId,
     businessName: "Manual Verification Shop",
-    url: `${baseUrl}/manual`
+    url: `${baseUrl}/manual`,
+    expectedReason: "Known local business from operator QA."
   });
 
   if (!withManual.candidates.some((candidate) => candidate.provenance === "manual")) {
     throw new Error("Manual candidate was not added to the report.");
   }
+
+  const manualCandidate = withManual.candidates.find(
+    (candidate) => candidate.provenance === "manual"
+  );
+  assert(manualCandidate);
+  assert.match(manualCandidate.provenanceNote ?? "", /Likely miss diagnostics/);
+  assert(
+    withManual.notes.some((note) => note.includes("Miss diagnostic for Manual Verification Shop"))
+  );
+  assert(
+    withManual.acquisition.notes.some((note) =>
+      note.includes("Miss learning for Manual Verification Shop")
+    )
+  );
 
   const withPromoted = await promoteDiscardedCandidateToRun({
     runId,

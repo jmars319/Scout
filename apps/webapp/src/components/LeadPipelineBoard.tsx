@@ -17,33 +17,39 @@ interface PipelineColumn {
   id: PipelineColumnId;
   title: string;
   description: string;
+  filter: string;
 }
 
 const columns: PipelineColumn[] = [
   {
     id: "due",
     title: "Due",
-    description: "Follow-ups due today or earlier."
+    description: "Follow-ups due today or earlier.",
+    filter: "due"
   },
   {
     id: "needs_draft",
     title: "Needs Draft",
-    description: "Open leads without usable outreach."
+    description: "Open leads without usable outreach.",
+    filter: "needs_draft"
   },
   {
     id: "ready",
     title: "Ready",
-    description: "Drafted leads ready for handoff."
+    description: "Drafted leads ready for handoff.",
+    filter: "ready"
   },
   {
     id: "contacted",
     title: "Contacted",
-    description: "Sent or called, now waiting."
+    description: "Sent or called, now waiting.",
+    filter: "contacted"
   },
   {
     id: "closed",
     title: "Closed",
-    description: "Dismissed or not a fit."
+    description: "Dismissed or not a fit.",
+    filter: "closed"
   }
 ];
 
@@ -153,7 +159,7 @@ export function LeadPipelineBoard({
             )}
 
             {columnItems.length > visibleItems.length ? (
-              <Link className="inline-link" href="/leads">
+              <Link className="inline-link" href={`/leads?filter=${column.filter}`}>
                 {columnItems.length - visibleItems.length} more
               </Link>
             ) : null}

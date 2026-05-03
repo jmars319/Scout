@@ -145,6 +145,12 @@ function buildMissDiagnostics(
   return diagnostics.slice(0, 5);
 }
 
+function buildMissLearningNotes(candidate: SearchCandidate, diagnostics: string[]): string[] {
+  return diagnostics.map(
+    (diagnostic) => `Miss learning for ${candidate.title}: ${diagnostic}`
+  );
+}
+
 function createCandidate(input: {
   title: string;
   url: string;
@@ -181,6 +187,7 @@ function rebuildReport(
     presences: ScoutRunReport["presences"];
     audits: PresenceAuditResult[];
     notes: string[];
+    acquisitionNotes?: string[] | undefined;
   }
 ): ScoutRunReport {
   const candidates = [...report.candidates, ...additions.candidates].map((candidate, index) => ({
@@ -247,6 +254,10 @@ function rebuildReport(
       report.acquisition.sampleQuality,
       auditedCandidateIds
     ),
+    acquisition: {
+      ...report.acquisition,
+      notes: [...report.acquisition.notes, ...(additions.acquisitionNotes ?? [])]
+    },
     notes: [...report.notes, ...additions.notes]
   };
 }
@@ -337,7 +348,8 @@ async function saveMutatedReport(record: PersistedRunRecord, report: ScoutRunRep
 async function addCandidatesToRun(
   runId: string,
   candidates: SearchCandidate[],
-  notes: string[]
+  notes: string[],
+  acquisitionNotes: string[] = []
 ): Promise<ScoutRunReport> {
   const repository = createRunRepository();
   const record = await repository.getRecord(runId);
@@ -361,7 +373,8 @@ async function addCandidatesToRun(
     candidates: filteredCandidates,
     presences: additions.presences,
     audits: additions.audits,
-    notes
+    notes,
+    acquisitionNotes
   });
 
   return saveMutatedReport(record, nextReport);
@@ -396,11 +409,17 @@ export async function addManualCandidateToRun(
     ...baseCandidate,
     provenanceNote
   };
+  const missLearningNotes = buildMissLearningNotes(candidate, missDiagnostics);
 
-  return addCandidatesToRun(input.runId, [candidate], [
-    `Operator manually added expected missing business ${candidate.title}.`,
-    ...missDiagnostics.map((diagnostic) => `Miss diagnostic for ${candidate.title}: ${diagnostic}`)
-  ]);
+  return addCandidatesToRun(
+    input.runId,
+    [candidate],
+    [
+      `Operator manually added expected missing business ${candidate.title}.`,
+      ...missDiagnostics.map((diagnostic) => `Miss diagnostic for ${candidate.title}: ${diagnostic}`)
+    ],
+    missLearningNotes
+  );
 }
 
 export async function promoteDiscardedCandidateToRun(

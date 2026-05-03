@@ -67,6 +67,6 @@ The report is intended to make operator judgment faster, not broader.
 - presence breakdown keeps non-owned, dead, blocked, and unknown presences visible
 - findings are normalized into stable issue types such as dead page, blocked content, missing contact path, missing primary CTA, accessibility issues, failed requests, and mobile layout issues
 - shortlist entries explain why the business matters, not only what broke
-- operator-added and promoted candidates are evaluated through the same presence, audit, classification, and shortlist rules while retaining their provenance labels and missed-business diagnostics
-- lead work is managed through both a pipeline board and a detailed inbox/detail view
+- operator-added and promoted candidates are evaluated through the same presence, audit, classification, and shortlist rules while retaining their provenance labels, missed-business diagnostics, and acquisition-learning notes
+- lead work is managed through both a pipeline board and a detailed inbox/detail view, with pipeline stages linking directly into matching inbox filters
 - structured run retrieval and queue state are Postgres-backed, while screenshot evidence remains local

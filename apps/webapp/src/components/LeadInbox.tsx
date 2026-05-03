@@ -25,7 +25,15 @@ import {
   toneForSampleQuality
 } from "./sample-quality-copy";
 
-type LeadInboxFilter = "all" | "open" | "saved" | "contacted" | "closed" | "due";
+type LeadInboxFilter =
+  | "all"
+  | "open"
+  | "needs_draft"
+  | "ready"
+  | "saved"
+  | "contacted"
+  | "closed"
+  | "due";
 type LeadBulkAction = "mark_contacted" | "dismiss" | "mark_not_a_fit" | "set_follow_up";
 
 interface LeadMessage {
@@ -37,6 +45,8 @@ const filterOptions: Array<{ value: LeadInboxFilter; label: string }> = [
   { value: "all", label: "All" },
   { value: "due", label: "Due" },
   { value: "open", label: "Open" },
+  { value: "needs_draft", label: "Needs Draft" },
+  { value: "ready", label: "Ready" },
   { value: "saved", label: "Saved" },
   { value: "contacted", label: "Contacted" },
   { value: "closed", label: "Closed" }
@@ -56,6 +66,18 @@ function isDue(item: LeadInboxItem, today: string): boolean {
   );
 }
 
+function isReady(item: LeadInboxItem): boolean {
+  return item.outreach.status === "draft_ready" || item.outreach.status === "edited_saved";
+}
+
+function needsDraft(item: LeadInboxItem): boolean {
+  return (
+    !isClosed(item.annotation.state) &&
+    item.annotation.state !== "contacted" &&
+    !isReady(item)
+  );
+}
+
 function matchesFilter(item: LeadInboxItem, filter: LeadInboxFilter, today: string): boolean {
   if (filter === "all") {
     return true;
@@ -63,6 +85,18 @@ function matchesFilter(item: LeadInboxItem, filter: LeadInboxFilter, today: stri
 
   if (filter === "open") {
     return item.annotation.state === "needs_review";
+  }
+
+  if (filter === "needs_draft") {
+    return needsDraft(item);
+  }
+
+  if (filter === "ready") {
+    return (
+      !isClosed(item.annotation.state) &&
+      item.annotation.state !== "contacted" &&
+      isReady(item)
+    );
   }
 
   if (filter === "closed") {
@@ -135,16 +169,20 @@ async function readErrorMessage(response: Response): Promise<string> {
 
 export function LeadInbox({
   initialItems,
+  initialFilter,
+  initialSearch = "",
   today
 }: {
   initialItems: LeadInboxItem[];
+  initialFilter?: LeadInboxFilter | undefined;
+  initialSearch?: string | undefined;
   today: string;
 }) {
   const [items, setItems] = useState(initialItems);
   const [filter, setFilter] = useState<LeadInboxFilter>(() =>
-    initialItems.some((item) => isDue(item, today)) ? "due" : "all"
+    initialFilter ?? (initialItems.some((item) => isDue(item, today)) ? "due" : "all")
   );
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initialSearch);
   const [pendingKey, setPendingKey] = useState<string | null>(null);
   const [messageByKey, setMessageByKey] = useState<Record<string, LeadMessage>>({});
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
@@ -156,6 +194,13 @@ export function LeadInbox({
       total: items.length,
       due: items.filter((item) => isDue(item, today)).length,
       open: items.filter((item) => item.annotation.state === "needs_review").length,
+      needsDraft: items.filter(needsDraft).length,
+      ready: items.filter(
+        (item) =>
+          !isClosed(item.annotation.state) &&
+          item.annotation.state !== "contacted" &&
+          isReady(item)
+      ).length,
       saved: items.filter((item) => item.annotation.state === "saved").length,
       contacted: items.filter((item) => item.annotation.state === "contacted").length,
       closed: items.filter((item) => isClosed(item.annotation.state)).length
@@ -430,6 +475,8 @@ export function LeadInbox({
           <Tag>{counts.total} Leads</Tag>
           <Tag tone={counts.due > 0 ? "warn" : "neutral"}>{counts.due} Due</Tag>
           <Tag>{counts.open} Open</Tag>
+          <Tag>{counts.needsDraft} Needs Draft</Tag>
+          <Tag tone="good">{counts.ready} Ready</Tag>
           <Tag tone="good">{counts.saved} Saved</Tag>
           <Tag tone="warn">{counts.contacted} Contacted</Tag>
           <Tag tone="danger">{counts.closed} Closed</Tag>
