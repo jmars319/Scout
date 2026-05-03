@@ -28,6 +28,7 @@ The run is now executed asynchronously:
 - the web app stores a queued run
 - a worker process claims it and performs the scan
 - the report page reads the lifecycle state and final report from Postgres
+- operators can cancel, retry, re-run, and clean up stale run state from the run page
 
 ## Deterministic Posture
 
@@ -60,10 +61,12 @@ Those opportunities become a shortlist the operator can act on.
 The report is intended to make operator judgment faster, not broader.
 
 - acquisition diagnostics explain how the candidate set was assembled, which provider attempts degraded, which sources supplied the kept sample, and whether fallback was involved
+- repeat scans of the same saved market compare against the previous completed run, including new/missing businesses, shortlist movement, and finding deltas
 - market confidence is called out in operator-facing language and backed by concrete acquisition reasons
 - market summary explains the search space and the audit/skipped split
 - presence breakdown keeps non-owned, dead, blocked, and unknown presences visible
 - findings are normalized into stable issue types such as dead page, blocked content, missing contact path, missing primary CTA, accessibility issues, failed requests, and mobile layout issues
 - shortlist entries explain why the business matters, not only what broke
-- operator-added and promoted candidates are evaluated through the same presence, audit, classification, and shortlist rules while retaining their provenance labels
+- operator-added and promoted candidates are evaluated through the same presence, audit, classification, and shortlist rules while retaining their provenance labels and missed-business diagnostics
+- lead work is managed through both a pipeline board and a detailed inbox/detail view
 - structured run retrieval and queue state are Postgres-backed, while screenshot evidence remains local

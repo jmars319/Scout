@@ -3,6 +3,7 @@ import Link from "next/link";
 import { AppFrame, Metric, MetricGrid, Panel } from "@scout/ui";
 
 import { LeadInbox } from "@/components/LeadInbox";
+import { LeadPipelineBoard } from "@/components/LeadPipelineBoard";
 import { ScoutNavigation } from "@/components/ScoutNavigation";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { listLeadInboxItems } from "@/lib/server/leads/lead-inbox-service";
@@ -47,6 +48,13 @@ export default async function LeadsPage() {
           <Metric label="Saved" value={savedCount} tone="good" />
           <Metric label="Contacted" value={contactedCount} tone="warn" />
         </MetricGrid>
+
+        <Panel
+          title="Pipeline"
+          description="A compact operating board for the current lead workload before opening the full inbox controls."
+        >
+          <LeadPipelineBoard items={items} today={today} />
+        </Panel>
 
         <Panel title="Lead Inbox">
           <LeadInbox initialItems={items} today={today} />

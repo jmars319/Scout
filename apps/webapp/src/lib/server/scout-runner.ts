@@ -53,3 +53,22 @@ export async function listRecentScoutRuns(limit = 6): Promise<RecentRunSummary[]
 export async function listSavedMarkets(limit = 12): Promise<SavedMarketSummary[]> {
   return createRunRepository().listSavedMarkets(limit);
 }
+
+export async function getPreviousCompletedScoutRunForMarket(
+  rawQuery: string,
+  beforeCreatedAt: string
+) {
+  return createRunRepository().getPreviousCompletedForMarket(rawQuery, beforeCreatedAt);
+}
+
+export async function cancelScoutRun(runId: string) {
+  return createRunRepository().cancelRun(runId);
+}
+
+export async function retryScoutRun(runId: string) {
+  return createRunRepository().retryRun(runId);
+}
+
+export async function cleanupStaleScoutRuns(staleRunMs: number) {
+  return createRunRepository().requeueStaleRuns(staleRunMs);
+}

@@ -5,7 +5,8 @@ import { useState } from "react";
 
 import {
   leadAnnotationResponseSchema,
-  leadInboxItemResponseSchema
+  leadInboxItemResponseSchema,
+  listOutreachDraftsResponseSchema
 } from "@scout/api-contracts";
 import type {
   AuditFinding,
@@ -137,7 +138,7 @@ export function LeadDetailView({
   candidate?: SearchCandidate | undefined;
 }) {
   const [item, setItem] = useState(initialItem);
-  const [draft] = useState<OutreachDraft | undefined>(initialDraft);
+  const [draft, setDraft] = useState<OutreachDraft | undefined>(initialDraft);
   const [message, setMessage] = useState<LeadMessage | null>(null);
   const [pendingKey, setPendingKey] = useState<string | null>(null);
   const recommendedChannel = resolveRecommendedChannel(draft);
@@ -194,6 +195,20 @@ export function LeadDetailView({
     setPendingKey(null);
   }
 
+  async function refreshDraft(runId: string, candidateId: string) {
+    const response = await fetch(`/api/runs/${encodeURIComponent(runId)}/outreach`, {
+      method: "GET"
+    });
+
+    if (!response.ok) {
+      setMessage({ text: await readErrorMessage(response), tone: "danger" });
+      return;
+    }
+
+    const body = listOutreachDraftsResponseSchema.parse(await response.json());
+    setDraft(body.drafts.find((entry) => entry.candidateId === candidateId));
+  }
+
   async function runAction(action: LeadAction) {
     if (pendingKey) {
       return;
@@ -230,6 +245,9 @@ export function LeadDetailView({
     const body = leadInboxItemResponseSchema.parse(await response.json());
     if (body.item) {
       setItem(body.item);
+      if (action === "analyze_contact" || action === "generate_draft") {
+        await refreshDraft(body.item.runId, body.item.candidateId);
+      }
     }
 
     setMessage({

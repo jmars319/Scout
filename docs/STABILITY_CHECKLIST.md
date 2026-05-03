@@ -46,7 +46,7 @@
 - `verify:queue`
   Confirms queued run creation, worker claim behavior, lifecycle transitions, and failure-note persistence.
 - `verify:http-smoke`
-  Confirms the real HTTP submit and retrieval path: the web server returns a queued response promptly, a worker picks the run up, lifecycle state moves through `queued -> running -> completed`, the final persisted report is retrievable from the real API, and lead inbox/detail/export flows render over HTTP.
+  Confirms the real HTTP submit and retrieval path: the web server returns a queued response promptly, a worker picks the run up, lifecycle state moves through `queued -> running -> completed`, the final persisted report is retrievable from the real API, lead inbox/detail/export flows render over HTTP, and run cancel/retry/re-run controls work through the API.
 - `verify:ui-smoke`
   Alias for `verify:http-smoke`, used when validating the browser-facing flow names rather than the lower-level HTTP lifecycle name.
 - `build:web`
@@ -54,11 +54,11 @@
 - `verify:desktop`
   Confirms the desktop package typechecks, validates the Electron Builder package settings, and verifies Electron can launch Scout's desktop runtime entrypoint.
 - `check:desktop-package`
-  Performs a fast, non-credential package-readiness check for the desktop bundle config, required runtime resources, and packaging entrypoints.
+  Performs a fast, non-credential package-readiness check for the desktop bundle config, hardened runtime setting, required runtime resources, packaged schema readiness, and packaging entrypoints.
 - `package:desktop`
   Confirms Scout can build a local macOS desktop package with a bundled production web runtime, bundled worker entrypoint, and bundled Chromium assets.
 - `package:desktop:release`
-  Confirms the release environment has Developer ID signing and Apple notarization credentials before building. This command is expected to fail on machines that are only configured for local ad-hoc packages.
+  Confirms the release environment has Developer ID signing and Apple notarization credentials before building, then validates the built `.app` with `codesign` and Gatekeeper assessment. This command is expected to fail on machines that are only configured for local ad-hoc packages.
 - `verify:mobile`
   Confirms the remaining mobile scaffold does not break workspace integrity.
 - `doctor`
@@ -74,7 +74,7 @@ The repo has been exercised with:
 
 That coverage verifies schema bootstrap, repository persistence, legacy-import handling, screenshot storage, and report retrieval path.
 That coverage also verifies the Postgres-backed queue loop and repository-driven lifecycle updates.
-`verify:http-smoke` adds a real HTTP boundary check without introducing a larger end-to-end framework. It now covers run submission, report retrieval, lead save, bulk lead update, lead inbox, lead detail, run pages, and lead export.
+`verify:http-smoke` adds a real HTTP boundary check without introducing a larger end-to-end framework. It now covers run submission, report retrieval, lead save, bulk lead update, lead inbox, lead detail, run pages, lead export, and run control actions.
 `verify:providers` adds direct protection for the hardened DuckDuckGo, Google, and Bing adapters plus manual-confirmation diagnostics without introducing a heavier test harness.
 
 ## Expected Limitations
@@ -83,5 +83,5 @@ That coverage also verifies the Postgres-backed queue loop and repository-driven
 - Run execution depends on a separate local worker process being started.
 - The queue is intentionally simple and Postgres-backed, not a distributed job system.
 - The desktop app is a thin Electron wrapper over the local web app and worker, not a second independent runtime architecture.
-- The packaged desktop build now seeds/defaults `DATABASE_URL=postgresql:///scout`, but it still expects a local Postgres service to be available. It is not yet an embedded single-file database runtime.
+- The packaged desktop build now seeds/defaults `DATABASE_URL=postgresql:///scout` and applies the bundled schema on startup, but it still expects a local Postgres service and database to be available. It is not yet an embedded single-file database runtime.
 - Screenshot evidence is still local-only.

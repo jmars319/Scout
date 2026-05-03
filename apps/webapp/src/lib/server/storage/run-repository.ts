@@ -19,6 +19,8 @@ export interface RunRepository {
   createQueuedRun: (input: QueuedRunRecordInput) => Promise<PersistedRunRecord>;
   claimNextQueuedRun: (workerId: string) => Promise<PersistedRunRecord | null>;
   requeueStaleRuns: (staleRunMs: number) => Promise<number>;
+  cancelRun: (runId: string) => Promise<PersistedRunRecord | null>;
+  retryRun: (runId: string) => Promise<PersistedRunRecord | null>;
   updateProgress: (
     runId: string,
     progress: {
@@ -33,6 +35,10 @@ export interface RunRepository {
   upsertRecord: (record: PersistedRunRecord) => Promise<PersistedRunRecord>;
   get: (runId: string) => Promise<ScoutRunReport | null>;
   getRecord: (runId: string) => Promise<PersistedRunRecord | null>;
+  getPreviousCompletedForMarket: (
+    rawQuery: string,
+    beforeCreatedAt: string
+  ) => Promise<ScoutRunReport | null>;
   listRecent: (limit?: number) => Promise<RecentRunSummary[]>;
   listSavedMarkets: (limit?: number) => Promise<SavedMarketSummary[]>;
 }
@@ -59,6 +65,8 @@ export function createRunRepository(): RunRepository {
     createQueuedRun: (input) => postgresRepository.createQueuedRun(input),
     claimNextQueuedRun: (workerId) => postgresRepository.claimNextQueuedRun(workerId),
     requeueStaleRuns: (staleRunMs) => postgresRepository.requeueStaleRuns(staleRunMs),
+    cancelRun: (runId) => postgresRepository.cancelRun(runId),
+    retryRun: (runId) => postgresRepository.retryRun(runId),
     updateProgress: (runId, progress) => postgresRepository.updateProgress(runId, progress),
     save: (report, persistence) => postgresRepository.save(report, persistence),
     upsertRecord: (record) => postgresRepository.upsertRecord(record),
@@ -69,6 +77,10 @@ export function createRunRepository(): RunRepository {
     },
 
     getRecord,
+    async getPreviousCompletedForMarket(rawQuery, beforeCreatedAt) {
+      const record = await postgresRepository.getPreviousCompletedForMarket(rawQuery, beforeCreatedAt);
+      return record ? toScoutRunReport(record) : null;
+    },
     listRecent: (limit) => postgresRepository.listRecent(limit),
     listSavedMarkets: (limit) => postgresRepository.listSavedMarkets(limit)
   };

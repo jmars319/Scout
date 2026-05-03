@@ -9,6 +9,8 @@ const buildConfig = packageJson.build ?? {};
 const macConfig = buildConfig.mac ?? {};
 const runtimeScript = readFileSync(path.join(desktopDir, "scripts/lib/runtime.mjs"), "utf8");
 const launcherScript = readFileSync(path.join(desktopDir, "scripts/lib/launcher.mjs"), "utf8");
+const prepareRuntimeScript = readFileSync(path.join(desktopDir, "scripts/prepare-runtime.mjs"), "utf8");
+const mainScript = readFileSync(path.join(desktopDir, "scripts/main.mjs"), "utf8");
 
 function fail(message) {
   throw new Error(`Scout desktop package readiness failed: ${message}`);
@@ -42,6 +44,18 @@ if (buildConfig.asar !== true) {
   fail("Electron Builder should package app code with asar enabled.");
 }
 
+if (macConfig.hardenedRuntime !== true) {
+  fail("mac release builds must enable hardenedRuntime.");
+}
+
+if (macConfig.gatekeeperAssess !== false) {
+  fail("Electron Builder gatekeeperAssess should be false during packaging; release artifact checks assess the final app.");
+}
+
+if (packageJson.scripts?.["check:release-artifacts"] !== "node ./scripts/check-release-artifacts.mjs") {
+  fail("package.json must expose check:release-artifacts for post-package release validation.");
+}
+
 requireArrayIncludes(buildConfig.files, "scripts/**/*", "Electron Builder files");
 requireArrayIncludes(macConfig.target, "dir", "mac targets");
 requireArrayIncludes(macConfig.target, "dmg", "mac targets");
@@ -65,10 +79,23 @@ if (!launcherScript.includes("DATABASE_URL=postgresql:///scout")) {
   fail("Packaged env template must seed DATABASE_URL=postgresql:///scout.");
 }
 
+if (!runtimeScript.includes("/api/desktop/readiness?ensure=1")) {
+  fail("Desktop runtime must verify database readiness through the packaged web app.");
+}
+
+if (!prepareRuntimeScript.includes("schemaRelativePath")) {
+  fail("Packaged desktop runtime manifest must include the database schema path.");
+}
+
+if (!mainScript.includes("SCOUT_SCHEMA_PATH")) {
+  fail("Packaged desktop runtime must pass SCOUT_SCHEMA_PATH to the web app and worker.");
+}
+
 for (const relativePath of [
   "scripts/main.mjs",
   "scripts/prepare-runtime.mjs",
   "scripts/check-release-env.mjs",
+  "scripts/check-release-artifacts.mjs",
   "scripts/lib/runtime.mjs",
   "scripts/lib/launcher.mjs",
   "scripts/lib/local-state.mjs"

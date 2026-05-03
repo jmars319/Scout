@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Metric, MetricGrid, Panel, Tag } from "@scout/ui";
 import type { RunExecutionStage } from "@scout/domain";
 
+import { RunControlActions } from "./RunControlActions";
 import type { PersistedRunRecord } from "@/lib/server/storage/run-repository";
 
 const REFRESH_INTERVAL_MS = 4_000;
@@ -257,9 +258,16 @@ export function RunStatusView({ record }: { record: PersistedRunRecord }) {
           </div>
         ) : null}
 
-        <button className="secondary-button" onClick={() => router.refresh()} type="button">
-          Refresh status
-        </button>
+        <div className="run-status-actions">
+          <button className="secondary-button" onClick={() => router.refresh()} type="button">
+            Refresh status
+          </button>
+          <RunControlActions
+            runId={record.runId}
+            showCleanup={looksStalled || record.status === "failed"}
+            status={record.status}
+          />
+        </div>
       </Panel>
     </div>
   );

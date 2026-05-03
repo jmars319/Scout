@@ -28,6 +28,29 @@ export const getScoutRunResponseSchema = z.object({
   errorMessage: z.string().optional()
 });
 
+export const runControlActionRequestSchema = z.discriminatedUnion("action", [
+  z.object({
+    action: z.literal("cancel")
+  }),
+  z.object({
+    action: z.literal("retry")
+  }),
+  z.object({
+    action: z.literal("rerun")
+  }),
+  z.object({
+    action: z.literal("cleanup_stale")
+  })
+]);
+
+export const runControlActionResponseSchema = z.object({
+  runId: z.string(),
+  status: z.enum(["queued", "running", "completed", "failed", "not_found"]),
+  newRunId: z.string().optional(),
+  requeuedCount: z.number().int().nonnegative().optional(),
+  errorMessage: z.string().optional()
+});
+
 export const updateLeadAnnotationRequestSchema = z.object({
   state: z.enum(leadStatuses),
   operatorNote: z.string().trim().max(1600).default(""),
@@ -162,6 +185,8 @@ export const outreachProfileResponseSchema = z.object({
 export type CreateScoutRunRequest = z.infer<typeof createScoutRunRequestSchema>;
 export type CreateScoutRunResponse = z.infer<typeof createScoutRunResponseSchema>;
 export type GetScoutRunResponse = z.infer<typeof getScoutRunResponseSchema>;
+export type RunControlActionRequest = z.infer<typeof runControlActionRequestSchema>;
+export type RunControlActionResponse = z.infer<typeof runControlActionResponseSchema>;
 export type UpdateLeadAnnotationRequest = z.infer<typeof updateLeadAnnotationRequestSchema>;
 export type ListLeadAnnotationsResponse = z.infer<typeof listLeadAnnotationsResponseSchema>;
 export type LeadAnnotationResponse = z.infer<typeof leadAnnotationResponseSchema>;

@@ -21,6 +21,8 @@ import {
   describeSampleQualityMeaning,
   toneForSampleQuality
 } from "./sample-quality-copy";
+import { RunControlActions } from "./RunControlActions";
+import type { MarketComparison } from "@/lib/server/market-comparison";
 
 function humanize(value: string): string {
   return value
@@ -293,6 +295,38 @@ function formatPercent(value: number): string {
   return `${Math.round(value * 100)}%`;
 }
 
+function formatSignedDelta(value: number): string {
+  if (value > 0) {
+    return `+${value}`;
+  }
+
+  return String(value);
+}
+
+function toneForFindingDelta(value: number): "neutral" | "good" | "warn" {
+  if (value < 0) {
+    return "good";
+  }
+
+  if (value > 0) {
+    return "warn";
+  }
+
+  return "neutral";
+}
+
+function toneForCountDelta(value: number): "neutral" | "good" | "warn" {
+  if (value > 0) {
+    return "good";
+  }
+
+  if (value < 0) {
+    return "warn";
+  }
+
+  return "neutral";
+}
+
 function buildSampleDecisionRows(report: ScoutRunReport): Array<{
   label: string;
   value: string;
@@ -443,7 +477,8 @@ function buildLeadTriageItems(
 export function ReportView({
   report,
   outreach,
-  leadAnnotations
+  leadAnnotations,
+  marketComparison
 }: {
   report: ScoutRunReport;
   outreach: {
@@ -454,6 +489,7 @@ export function ReportView({
     drafts: OutreachDraft[];
   };
   leadAnnotations: LeadAnnotation[];
+  marketComparison?: MarketComparison | null | undefined;
 }) {
   const findingsByCandidate = groupFindings(report.findings);
   const ownedWebsiteCount = report.presences.filter(
@@ -496,6 +532,184 @@ export function ReportView({
         />
         <Metric label="Shortlist" value={report.shortlist.length} tone="warn" />
       </MetricGrid>
+
+      <Panel
+        title="Run Operations"
+        description="Queue another scan from the same query, or retry this run if it ended before a report could be completed."
+      >
+        <RunControlActions runId={report.runId} status={report.status} />
+      </Panel>
+
+      {marketComparison ? (
+        <Panel
+          title="Market Comparison"
+          description={`Compared with ${new Date(
+            marketComparison.previousRunAt
+          ).toLocaleString()} for the same saved market query.`}
+        >
+          <div className="tag-row" style={{ marginBottom: "1rem" }}>
+            <Tag tone={toneForSampleQuality(marketComparison.previousSampleQuality)}>
+              Previous {describeSampleQuality(marketComparison.previousSampleQuality)}
+            </Tag>
+            <Tag tone={toneForSampleQuality(marketComparison.currentSampleQuality)}>
+              Current {describeSampleQuality(marketComparison.currentSampleQuality)}
+            </Tag>
+            <Link className="inline-link" href={`/runs/${marketComparison.previousRunId}`}>
+              Previous run
+            </Link>
+          </div>
+
+          <div className="sample-decision-grid comparison-metric-grid">
+            <div className="sample-decision-row">
+              <span>Candidates</span>
+              <Tag tone={toneForCountDelta(marketComparison.candidateCountDelta)}>
+                {formatSignedDelta(marketComparison.candidateCountDelta)}
+              </Tag>
+            </div>
+            <div className="sample-decision-row">
+              <span>Shortlist</span>
+              <Tag tone={toneForCountDelta(marketComparison.shortlistCountDelta)}>
+                {formatSignedDelta(marketComparison.shortlistCountDelta)}
+              </Tag>
+            </div>
+            <div className="sample-decision-row">
+              <span>Findings</span>
+              <Tag tone={toneForFindingDelta(marketComparison.findingCountDelta)}>
+                {formatSignedDelta(marketComparison.findingCountDelta)}
+              </Tag>
+            </div>
+            <div className="sample-decision-row">
+              <span>High Severity</span>
+              <Tag tone={toneForFindingDelta(marketComparison.highSeverityFindingDelta)}>
+                {formatSignedDelta(marketComparison.highSeverityFindingDelta)}
+              </Tag>
+            </div>
+          </div>
+
+          <div className="scout-grid two-up" style={{ marginTop: "1rem" }}>
+            <div>
+              <div className="section-label">New Businesses</div>
+              {marketComparison.newBusinesses.length > 0 ? (
+                <ul className="note-list">
+                  {marketComparison.newBusinesses.map((business) => (
+                    <li key={`new-${business.primaryUrl}`}>
+                      <Link className="inline-link" href={business.primaryUrl} target="_blank">
+                        {business.businessName}
+                      </Link>
+                      {business.shortlistRank ? ` / shortlist #${business.shortlistRank}` : ""}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="muted" style={{ margin: 0 }}>
+                  No new kept businesses compared with the previous scan.
+                </p>
+              )}
+            </div>
+
+            <div>
+              <div className="section-label">Missing Businesses</div>
+              {marketComparison.missingBusinesses.length > 0 ? (
+                <ul className="note-list">
+                  {marketComparison.missingBusinesses.map((business) => (
+                    <li key={`missing-${business.primaryUrl}`}>
+                      <Link className="inline-link" href={business.primaryUrl} target="_blank">
+                        {business.businessName}
+                      </Link>
+                      {business.shortlistRank ? ` / was shortlist #${business.shortlistRank}` : ""}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="muted" style={{ margin: 0 }}>
+                  No previously kept businesses disappeared from this scan.
+                </p>
+              )}
+            </div>
+          </div>
+
+          {marketComparison.rankChanges.length > 0 ? (
+            <div className="section-stack" style={{ marginTop: "1rem" }}>
+              <div className="section-label">Shortlist Movement</div>
+              <table className="finding-table acquisition-table">
+                <thead>
+                  <tr>
+                    <th>Business</th>
+                    <th>Previous</th>
+                    <th>Current</th>
+                    <th>Move</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {marketComparison.rankChanges.map((change) => (
+                    <tr key={`rank-${change.primaryUrl}`}>
+                      <td>{change.businessName}</td>
+                      <td>#{change.previousRank}</td>
+                      <td>#{change.currentRank}</td>
+                      <td>
+                        <Tag tone={change.delta > 0 ? "good" : "warn"}>
+                          {change.delta > 0 ? `Up ${change.delta}` : `Down ${Math.abs(change.delta)}`}
+                        </Tag>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+
+          {marketComparison.findingChanges.length > 0 ? (
+            <div className="section-stack" style={{ marginTop: "1rem" }}>
+              <div className="section-label">Finding Changes</div>
+              <table className="finding-table acquisition-table">
+                <thead>
+                  <tr>
+                    <th>Business</th>
+                    <th>Findings</th>
+                    <th>High Severity</th>
+                    <th>Current Issues</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {marketComparison.findingChanges.map((change) => (
+                    <tr key={`findings-${change.primaryUrl}`}>
+                      <td>{change.businessName}</td>
+                      <td>
+                        <Tag tone={toneForFindingDelta(change.findingDelta)}>
+                          {change.previousFindingCount} to {change.currentFindingCount}
+                        </Tag>
+                      </td>
+                      <td>
+                        <Tag tone={toneForFindingDelta(change.highSeverityDelta)}>
+                          {change.previousHighSeverityFindings} to {change.currentHighSeverityFindings}
+                        </Tag>
+                      </td>
+                      <td>
+                        {change.currentTopIssues.length > 0
+                          ? change.currentTopIssues.map(humanize).join(", ")
+                          : "None"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+
+          {marketComparison.issueChanges.length > 0 ? (
+            <div className="section-stack" style={{ marginTop: "1rem" }}>
+              <div className="section-label">Issue Mix Changes</div>
+              <div className="tag-row">
+                {marketComparison.issueChanges.map((change) => (
+                  <Tag key={change.issueType} tone={toneForFindingDelta(change.delta)}>
+                    {humanize(change.issueType)} {formatSignedDelta(change.delta)}
+                  </Tag>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </Panel>
+      ) : null}
 
       <div className="scout-grid report-overview-grid">
         <Panel title="Market Summary">

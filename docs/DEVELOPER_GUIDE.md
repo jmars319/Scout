@@ -143,6 +143,7 @@ Run storage and evidence storage both live behind explicit adapters. The worker 
   `SCOUT_WORKER_POLL_MS`
   `SCOUT_WORKER_STALE_RUN_MS`
 - If a worker attempt stalls past the stale-run threshold, the row is re-queued on the next worker loop with a short worker note.
+- Run pages also expose operator controls for canceling active runs, retrying failed runs in place, re-running the same raw query as a fresh run, and manually triggering stale-run cleanup.
 
 ## Verification
 
@@ -159,7 +160,7 @@ Run storage and evidence storage both live behind explicit adapters. The worker 
 - `pnpm run verify:queue`
   Applies the schema, creates queued runs, verifies worker claim behavior, verifies completed and failed lifecycle transitions, and deletes the verification rows.
 - `pnpm run verify:http-smoke`
-  Starts a temporary Next.js dev server plus a one-shot worker on an isolated local port, warms the real API routes, submits a run through `POST /api/scout/run`, confirms the queued response, waits for `queued -> running -> completed`, retrieves the final report through `GET /api/runs/:runId`, and deletes the verification row plus local evidence.
+  Starts a temporary Next.js dev server plus a one-shot worker on an isolated local port, warms the real API routes, submits a run through `POST /api/scout/run`, confirms the queued response, waits for `queued -> running -> completed`, retrieves the final report through `GET /api/runs/:runId`, verifies lead UI/export paths plus run control actions, and deletes the verification rows plus local evidence.
 - `pnpm run verify:web`
   Runs lint, typecheck, acquisition verification, provider verification, candidate-addition verification, persistence verification, queue verification, and the web build.
 
@@ -192,7 +193,7 @@ Desktop startup also prunes cache-heavy folders inside that profile at most once
   Runs a release preflight before packaging. The preflight requires a Developer ID signing identity through `CSC_LINK`, `CSC_NAME`, or the macOS keychain, and one notarization credential set:
   `APPLE_API_KEY`/`APPLE_API_KEY_ID`/`APPLE_API_ISSUER`,
   `APPLE_ID`/`APPLE_APP_SPECIFIC_PASSWORD`/`APPLE_TEAM_ID`,
-  or `APPLE_KEYCHAIN_PROFILE`.
+  or `APPLE_KEYCHAIN_PROFILE`. After packaging, Scout verifies the built `.app` with `codesign` and `spctl`.
 - `pnpm run install:desktop`
   Packages Scout, copies `Scout by JAMARQ.app` into `~/Applications`, seeds the packaged desktop env file, and opens the installed app.
 - `pnpm run launch:desktop`
@@ -204,11 +205,12 @@ Desktop stays intentionally thin. It does not introduce a second product workflo
 
 ## Packaged Desktop Env
 
-- The packaged app still requires `DATABASE_URL`.
+- The packaged app still expects a reachable local Postgres service.
 - On first packaged launch, Scout now auto-creates:
   `~/Library/Application Support/Scout by JAMARQ/.env`
   with `DATABASE_URL=postgresql:///scout` as the local default.
 - You can edit that file later if you need a different Postgres target or want to add `OPENAI_API_KEY`.
+- Desktop startup asks the packaged web runtime to connect to Postgres and apply the bundled Scout schema before opening the window. If local Postgres is not running or the `scout` database does not exist, the desktop shell fails with the env file path and a concrete database setup hint.
 - The packaged app also checks:
   `Scout.app/Contents/Resources/scout.env`
 - `EVIDENCE_LOCAL_DIR` is set automatically for the packaged app to a user-data evidence folder, so screenshot storage stays outside the app bundle.
@@ -218,4 +220,4 @@ Desktop stays intentionally thin. It does not introduce a second product workflo
 
 Use `pnpm run package:desktop` for local builds and internal smoke testing. It can produce working artifacts without Apple credentials, but those artifacts are ad-hoc signed and are not suitable for public distribution.
 
-Use `pnpm run package:desktop:release` when preparing a public macOS build. The script intentionally fails before the expensive packaging step unless Developer ID signing and notarization credentials are present. Electron Builder performs the notarization during packaging once those credentials are available.
+Use `pnpm run package:desktop:release` when preparing a public macOS build. The script intentionally fails before the expensive packaging step unless Developer ID signing and notarization credentials are present. After packaging, `check:release-artifacts` verifies the app bundle signature, Developer ID authority, and Gatekeeper assessment.

@@ -12,6 +12,8 @@ import {
 } from "./persisted-run-record.ts";
 import { getPostgresClient } from "./postgres-client.ts";
 
+const CANCELED_RUN_MESSAGE = "Run canceled by operator.";
+
 export interface RecentRunSummary {
   runId: string;
   status: PersistedRunRecord["status"];
@@ -321,6 +323,14 @@ export function createPostgresRunRepository() {
       report: ScoutRunReport,
       persistence: PersistenceMetadataInput = {}
     ): Promise<PersistedRunRecord> {
+      const existing = await repository.getRecord(report.runId);
+      if (
+        existing?.status === "failed" &&
+        existing.execution.lastErrorMessage === CANCELED_RUN_MESSAGE
+      ) {
+        return existing;
+      }
+
       return upsertRecord(
         createPersistedRunRecord(report, await buildFinalizedRecordOptions(report, persistence))
       );
@@ -414,6 +424,58 @@ export function createPostgresRunRepository() {
       return rows.length;
     },
 
+    async cancelRun(runId: string): Promise<PersistedRunRecord | null> {
+      const [row] = await sql<ScoutRunRow[]>`
+        update scout_runs
+        set
+          status = 'failed',
+          updated_at = now(),
+          finished_at = now(),
+          heartbeat_at = now(),
+          worker_stage = 'failed',
+          worker_note = ${CANCELED_RUN_MESSAGE},
+          last_error_message = ${CANCELED_RUN_MESSAGE},
+          error_message = ${CANCELED_RUN_MESSAGE}
+        where run_id = ${runId}
+          and status in ('queued', 'running')
+        returning *
+      `;
+
+      return row ? mapRowToRecord(row) : null;
+    },
+
+    async retryRun(runId: string): Promise<PersistedRunRecord | null> {
+      const [row] = await sql<ScoutRunRow[]>`
+        update scout_runs
+        set
+          status = 'queued',
+          updated_at = now(),
+          queued_at = now(),
+          started_at = null,
+          finished_at = null,
+          heartbeat_at = now(),
+          attempt_count = 0,
+          worker_stage = 'queued',
+          worker_id = null,
+          worker_note = 'Run manually re-queued by operator.',
+          last_error_message = null,
+          search_provider = null,
+          search_source = null,
+          sample_quality = null,
+          acquisition = null,
+          selected_candidates = ${sql.json([])},
+          business_results = null,
+          shortlist = ${sql.json([])},
+          notes = ${sql.json([])},
+          error_message = null
+        where run_id = ${runId}
+          and status = 'failed'
+        returning *
+      `;
+
+      return row ? mapRowToRecord(row) : null;
+    },
+
     async updateProgress(
       runId: string,
       progress: {
@@ -505,6 +567,55 @@ export function createPostgresRunRepository() {
           persistence_metadata
         from scout_runs
         where run_id = ${runId}
+        limit 1
+      `;
+
+      return row ? mapRowToRecord(row) : null;
+    },
+
+    async getPreviousCompletedForMarket(
+      rawQuery: string,
+      beforeCreatedAt: string
+    ): Promise<PersistedRunRecord | null> {
+      const [row] = await sql<ScoutRunRow[]>`
+        select
+          run_id,
+          schema_version,
+          status,
+          created_at,
+          updated_at,
+          queued_at,
+          started_at,
+          finished_at,
+          heartbeat_at,
+          attempt_count,
+          worker_stage,
+          worker_id,
+          worker_note,
+          last_error_message,
+          raw_query,
+          normalized_query,
+          market_term,
+          categories,
+          location_label,
+          location_city,
+          location_region,
+          search_query,
+          search_provider,
+          search_source,
+          sample_quality,
+          acquisition,
+          selected_candidates,
+          business_results,
+          shortlist,
+          notes,
+          error_message,
+          persistence_metadata
+        from scout_runs
+        where lower(raw_query) = lower(${rawQuery})
+          and status = 'completed'
+          and created_at < ${beforeCreatedAt}
+        order by created_at desc
         limit 1
       `;
 

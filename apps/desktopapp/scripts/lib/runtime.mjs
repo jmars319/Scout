@@ -151,6 +151,7 @@ export async function getAvailablePort() {
 export async function waitForServerReady(baseUrl, processRef) {
   const deadline = Date.now() + 90_000;
   let lastError = "Scout desktop web surface did not respond yet.";
+  const healthUrl = new URL("/api/health", baseUrl).toString();
 
   while (Date.now() < deadline) {
     if (processRef.child.exitCode !== null) {
@@ -158,7 +159,7 @@ export async function waitForServerReady(baseUrl, processRef) {
     }
 
     try {
-      const response = await fetch(baseUrl, {
+      const response = await fetch(healthUrl, {
         signal: AbortSignal.timeout(2_000)
       });
 
@@ -175,6 +176,45 @@ export async function waitForServerReady(baseUrl, processRef) {
   }
 
   throw new Error(lastError);
+}
+
+export async function ensureDesktopWebReadiness(baseUrl, options = {}) {
+  const readinessUrl = new URL("/api/desktop/readiness?ensure=1", baseUrl).toString();
+  let payload = null;
+
+  try {
+    const response = await fetch(readinessUrl, {
+      signal: AbortSignal.timeout(15_000)
+    });
+    payload = await response.json().catch(() => null);
+
+    if (response.ok && payload?.ok) {
+      return payload;
+    }
+  } catch (error) {
+    payload = {
+      message: error instanceof Error ? error.message : "Unknown readiness request failure."
+    };
+  }
+
+  const envFileMessage = options.envFilePath
+    ? `\nDesktop env file: ${options.envFilePath}`
+    : "";
+  const databaseUrlMessage = process.env.DATABASE_URL
+    ? `\nDATABASE_URL: ${process.env.DATABASE_URL}`
+    : "";
+
+  throw new Error(
+    [
+      "Scout desktop could not prepare local storage.",
+      payload?.message ?? "The desktop readiness endpoint did not return a usable response.",
+      "Make sure local Postgres is running and that the `scout` database exists.",
+      "For a default Homebrew setup: `createdb scout` is usually enough after Postgres is started.",
+      `${envFileMessage}${databaseUrlMessage}`
+    ]
+      .filter(Boolean)
+      .join("\n")
+  );
 }
 
 function getElectronBinaryPath() {
@@ -297,6 +337,9 @@ export async function runDesktopShell({ webMode }) {
 
   try {
     await waitForServerReady(baseUrl, webProcess);
+    await ensureDesktopWebReadiness(baseUrl, {
+      envFilePath: path.resolve(repoRoot, ".env")
+    });
     electronProcess = await launchElectron(baseUrl);
 
     webProcess.child.on("exit", (code) => {

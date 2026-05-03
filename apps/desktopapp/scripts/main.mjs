@@ -8,6 +8,7 @@ const { app, BrowserWindow, dialog, shell } = require("electron/main");
 
 import {
   createManagedProcess,
+  ensureDesktopWebReadiness,
   ensureDesktopDatabaseUrl,
   getAvailablePort,
   loadEnvFiles,
@@ -51,6 +52,7 @@ async function readRuntimeManifest() {
     webappDirPath: path.resolve(process.resourcesPath, "desktop-runtime", manifest.webappRelativePath),
     nextCliPath: path.resolve(process.resourcesPath, "desktop-runtime", manifest.nextCliRelativePath),
     workerEntryPath: path.resolve(process.resourcesPath, "desktop-runtime", manifest.workerRelativePath),
+    schemaPath: path.resolve(process.resourcesPath, "desktop-runtime", manifest.schemaRelativePath),
     browsersDirPath: path.resolve(process.resourcesPath, "desktop-runtime", manifest.browsersRelativePath)
   };
 }
@@ -86,7 +88,7 @@ async function shutdownRuntime() {
 async function startPackagedRuntime() {
   const userDataDir = app.getPath("userData");
   const localState = getPackagedDesktopLocalState(userDataDir);
-  await ensurePackagedUserEnvFile({
+  const envResult = await ensurePackagedUserEnvFile({
     name: appName,
     userDataDirPath: userDataDir
   });
@@ -116,6 +118,7 @@ async function startPackagedRuntime() {
     SCOUT_INTERACTIVE_SEARCH: "1",
     SCOUT_INTERACTIVE_SEARCH_PROFILE_DIR: localState.profileDir,
     SCOUT_RUNTIME_ROOT: manifest.webappDirPath,
+    SCOUT_SCHEMA_PATH: manifest.schemaPath,
     EVIDENCE_LOCAL_DIR: localState.evidenceDir,
     PLAYWRIGHT_BROWSERS_PATH: manifest.browsersDirPath,
     ELECTRON_RUN_AS_NODE: "1"
@@ -161,6 +164,9 @@ async function startPackagedRuntime() {
   );
 
   await waitForServerReady(baseUrl, webProcess);
+  await ensureDesktopWebReadiness(baseUrl, {
+    envFilePath: envResult.envFilePath
+  });
 
   return {
     baseUrl,

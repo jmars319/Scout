@@ -1,4 +1,4 @@
-import { mkdir, rename, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
@@ -11,6 +11,7 @@ const runtimeDir = path.resolve(desktopDir, ".desktop-runtime");
 const webRuntimeStagingDir = path.resolve(runtimeDir, ".webapp-staging");
 const webRuntimeDir = path.resolve(runtimeDir, "webapp");
 const browserRuntimeDir = path.resolve(runtimeDir, "playwright");
+const schemaRuntimeDir = path.resolve(runtimeDir, "schema");
 const hashedPlaywrightPackageName = "playwright-f3e876efb1eb8da1";
 const pnpmBin = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
 
@@ -118,11 +119,22 @@ async function writeRuntimeManifest() {
         webappRelativePath: "webapp",
         nextCliRelativePath: "webapp/node_modules/next/dist/bin/next",
         workerRelativePath: "webapp/desktop/worker.cjs",
+        schemaRelativePath: "schema/001_create_scout_runs.sql",
         browsersRelativePath: "playwright"
       },
       null,
       2
     )}\n`
+  );
+}
+
+async function copyDatabaseSchema() {
+  await mkdir(schemaRuntimeDir, {
+    recursive: true
+  });
+  await copyFile(
+    path.resolve(repoRoot, "scripts/sql/001_create_scout_runs.sql"),
+    path.resolve(schemaRuntimeDir, "001_create_scout_runs.sql")
   );
 }
 
@@ -149,6 +161,9 @@ await ensureTurbopackExternalAliases();
 
 console.log("Bundling the packaged worker runtime...");
 await bundleWorkerRuntime();
+
+console.log("Copying the packaged database schema...");
+await copyDatabaseSchema();
 
 console.log("Installing bundled Chromium for packaged Scout desktop...");
 await installBundledChromium();

@@ -10,6 +10,7 @@ import {
   leadAnnotationResponseSchema,
   leadInboxBulkActionResponseSchema,
   listLeadInboxResponseSchema,
+  runControlActionResponseSchema,
   type CreateScoutRunResponse,
   type GetScoutRunResponse
 } from "../packages/api-contracts/src/index.ts";
@@ -273,6 +274,84 @@ async function verifyLeadUiFlow(baseUrl: string, runId: string, report: NonNulla
   assert.match(await exportResponse.text(), /# Scout Lead Inbox/);
 }
 
+async function verifyRunControls(baseUrl: string): Promise<string[]> {
+  const submitted = await fetchJson<CreateScoutRunResponse>(
+    `${baseUrl}/api/scout/run`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        rawQuery: "run controls smoke market"
+      })
+    },
+    parseCreateScoutRunResponse
+  );
+  assert.equal(submitted.status, 202);
+  assert.equal(submitted.body.status, "queued");
+
+  const runId = submitted.body.runId;
+  const cancel = await fetchJson(
+    `${baseUrl}/api/runs/${runId}/actions`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({ action: "cancel" })
+    },
+    (value) => runControlActionResponseSchema.parse(value)
+  );
+  assert.equal(cancel.status, 200);
+  assert.equal(cancel.body.status, "failed");
+
+  const retry = await fetchJson(
+    `${baseUrl}/api/runs/${runId}/actions`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({ action: "retry" })
+    },
+    (value) => runControlActionResponseSchema.parse(value)
+  );
+  assert.equal(retry.status, 200);
+  assert.equal(retry.body.status, "queued");
+
+  const cleanup = await fetchJson(
+    `${baseUrl}/api/runs/${runId}/actions`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({ action: "cleanup_stale" })
+    },
+    (value) => runControlActionResponseSchema.parse(value)
+  );
+  assert.equal(cleanup.status, 200);
+  assert.equal(cleanup.body.status, "queued");
+  assert.equal(typeof cleanup.body.requeuedCount, "number");
+
+  const rerun = await fetchJson(
+    `${baseUrl}/api/runs/${runId}/actions`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({ action: "rerun" })
+    },
+    (value) => runControlActionResponseSchema.parse(value)
+  );
+  assert.equal(rerun.status, 202);
+  assert(rerun.body.newRunId);
+
+  return rerun.body.newRunId ? [runId, rerun.body.newRunId] : [runId];
+}
+
 async function waitForServerReady(baseUrl: string, processRef: ManagedProcess): Promise<void> {
   const deadline = Date.now() + 90_000;
   let lastError = "Scout web server did not respond yet.";
@@ -324,20 +403,25 @@ async function warmRoutes(baseUrl: string): Promise<void> {
   assert.equal(warmPost.status, 400);
 }
 
-async function removeSmokeArtifacts(runId: string | null, processEnv: Record<string, string>): Promise<void> {
-  if (!runId) {
+async function removeSmokeArtifacts(runIds: string[], processEnv: Record<string, string>): Promise<void> {
+  const uniqueRunIds = [...new Set(runIds.filter(Boolean))];
+
+  if (uniqueRunIds.length === 0) {
     return;
   }
 
   const sql = getPostgresClient();
-  await sql`delete from scout_runs where run_id = ${runId}`;
+  await sql`delete from scout_runs where run_id = any(${sql.array(uniqueRunIds)})`;
 
   const evidenceConfig = getEvidenceStorageConfig(processEnv);
-  const evidencePath = path.resolve(getRepoRoot(), evidenceConfig.localDir, runId);
-  await rm(evidencePath, {
-    recursive: true,
-    force: true
-  });
+  await Promise.all(
+    uniqueRunIds.map((runId) =>
+      rm(path.resolve(getRepoRoot(), evidenceConfig.localDir, runId), {
+        recursive: true,
+        force: true
+      })
+    )
+  );
 }
 
 function createProcessEnv(baseUrl: string): Record<string, string> {
@@ -368,6 +452,7 @@ async function main(): Promise<void> {
   const baseUrl = `http://127.0.0.1:${port}`;
   const processEnv = createProcessEnv(baseUrl);
   let runId: string | null = null;
+  const runIdsToRemove: string[] = [];
   let lastObservedStatus = "not_submitted";
   let webProcess: ManagedProcess | null = null;
   let workerProcess: ManagedProcess | null = null;
@@ -406,6 +491,7 @@ async function main(): Promise<void> {
       `Run submission took ${submitDurationMs}ms, which exceeds the ${SUBMIT_RESPONSE_MAX_MS}ms smoke threshold.`
     );
     runId = submitted.body.runId;
+    runIdsToRemove.push(runId);
     observedStatuses.add(submitted.body.status);
     lastObservedStatus = submitted.body.status;
 
@@ -513,6 +599,7 @@ async function main(): Promise<void> {
     assert.ok(Array.isArray(report.notes));
 
     await verifyLeadUiFlow(baseUrl, runId, report);
+    runIdsToRemove.push(...(await verifyRunControls(baseUrl)));
 
     console.log(
       `HTTP smoke verification passed for ${runId}. Observed statuses: ${[...observedStatuses].join(" -> ")}.`
@@ -536,7 +623,7 @@ async function main(): Promise<void> {
   } finally {
     await stopManagedProcessIfNeeded(workerProcess).catch(() => {});
     await stopManagedProcessIfNeeded(webProcess).catch(() => {});
-    await removeSmokeArtifacts(runId, processEnv).catch(() => {});
+    await removeSmokeArtifacts(runIdsToRemove, processEnv).catch(() => {});
     await closeScoutSchemaClient();
   }
 }

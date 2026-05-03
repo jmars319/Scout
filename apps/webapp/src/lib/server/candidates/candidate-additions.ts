@@ -53,6 +53,98 @@ function buildCandidateId(provenance: CandidateProvenanceKind, title: string, ur
   return `${provenance}-${Date.now()}-${slugify(`${title}-${host}`) || "candidate"}`;
 }
 
+function normalizeName(value: string | undefined): string {
+  return (value ?? "")
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function sameOrSimilarName(left: string | undefined, right: string | undefined): boolean {
+  const normalizedLeft = normalizeName(left);
+  const normalizedRight = normalizeName(right);
+
+  if (!normalizedLeft || !normalizedRight) {
+    return false;
+  }
+
+  return normalizedLeft.includes(normalizedRight) || normalizedRight.includes(normalizedLeft);
+}
+
+function domainFromUrl(value: string | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    return new URL(value).hostname.replace(/^www\./, "").toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+function buildMissDiagnostics(
+  report: ScoutRunReport,
+  candidate: SearchCandidate,
+  expectedReason: string | undefined
+): string[] {
+  const candidateDomain = domainFromUrl(candidate.url) ?? candidate.domain;
+  const discardedMatch = report.acquisition.discardedCandidates.find((discarded) => {
+    const discardedDomain = domainFromUrl(discarded.url);
+    return (
+      (discardedDomain && discardedDomain === candidateDomain) ||
+      sameOrSimilarName(discarded.title, candidate.title)
+    );
+  });
+  const diagnostics: string[] = [];
+
+  if (expectedReason?.trim()) {
+    diagnostics.push(`Operator expected it because: ${expectedReason.trim()}`);
+  }
+
+  if (discardedMatch) {
+    diagnostics.push(
+      `Scout saw a similar acquisition result but discarded it during filtering: ${discardedMatch.reason}`
+    );
+  } else {
+    diagnostics.push(
+      `Scout did not keep ${candidateDomain} in the original selected candidate set, which points to a provider or query-variant coverage gap.`
+    );
+  }
+
+  if (report.acquisition.mergedDuplicateCount > 0) {
+    diagnostics.push(
+      `Duplicate handling merged ${report.acquisition.mergedDuplicateCount} result(s); similar names or domains may have been collapsed before review.`
+    );
+  }
+
+  if (report.acquisition.discardedCandidateCount > 0 && !discardedMatch) {
+    diagnostics.push(
+      `${report.acquisition.discardedCandidateCount} acquisition result(s) were discarded as low-value, duplicate, or non-specific before this manual check.`
+    );
+  }
+
+  if (
+    report.acquisition.liveCandidateCount === 0 ||
+    report.acquisition.providerAttempts.some(
+      (attempt) => attempt.kind === "live" && attempt.outcome !== "success" && attempt.outcome !== "empty"
+    )
+  ) {
+    diagnostics.push(
+      "Live search was degraded for this run, so missing a known local business is more likely a provider issue than a Scout scoring decision."
+    );
+  }
+
+  if (report.acquisition.selectedCandidateCount > 0 && report.acquisition.selectedCandidateCount < 10) {
+    diagnostics.push(
+      `Only ${report.acquisition.selectedCandidateCount} final candidate(s) survived acquisition filtering, so the market sample was narrow.`
+    );
+  }
+
+  return diagnostics.slice(0, 5);
+}
+
 function createCandidate(input: {
   title: string;
   url: string;
@@ -280,23 +372,34 @@ export async function addManualCandidateToRun(
 ): Promise<ScoutRunReport> {
   const repository = createRunRepository();
   const report = await repository.get(input.runId);
-  const nextRank = (report?.candidates.length ?? 0) + 1;
-  const candidate = createCandidate({
+
+  if (!report) {
+    throw new Error("Scout run not found.");
+  }
+
+  const nextRank = report.candidates.length + 1;
+  const baseCandidate = createCandidate({
     title: input.businessName,
     url: input.url,
     source: "manual",
     rank: nextRank,
     provenance: "manual",
     snippet: "Operator supplied this business manually after the initial live acquisition.",
-    provenanceNote: input.expectedReason?.trim()
-      ? `Operator-supplied missed business. Expected signal: ${input.expectedReason.trim()}`
-      : "Operator-supplied candidate. Scout evaluated it with the same presence, audit, and shortlist rules."
+    provenanceNote: "Operator-supplied candidate. Scout evaluated it with the same presence, audit, and shortlist rules."
   });
+  const missDiagnostics = buildMissDiagnostics(report, baseCandidate, input.expectedReason);
+  const provenanceNote = [
+    "Operator-supplied missed business.",
+    `Likely miss diagnostics: ${missDiagnostics.join(" ")}`
+  ].join(" ");
+  const candidate: SearchCandidate = {
+    ...baseCandidate,
+    provenanceNote
+  };
 
   return addCandidatesToRun(input.runId, [candidate], [
-    input.expectedReason?.trim()
-      ? `Operator manually added expected missing business ${candidate.title}. Expected signal: ${input.expectedReason.trim()}`
-      : `Operator manually added ${candidate.title} to the report.`
+    `Operator manually added expected missing business ${candidate.title}.`,
+    ...missDiagnostics.map((diagnostic) => `Miss diagnostic for ${candidate.title}: ${diagnostic}`)
   ]);
 }
 

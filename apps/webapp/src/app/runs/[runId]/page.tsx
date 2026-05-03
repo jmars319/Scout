@@ -8,8 +8,13 @@ import { RunStatusView } from "@/components/RunStatusView";
 import { ScoutNavigation } from "@/components/ScoutNavigation";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { getLeadAnnotations } from "@/lib/server/leads/lead-workflow-service";
+import { buildMarketComparison } from "@/lib/server/market-comparison";
 import { getOutreachWorkspaceState } from "@/lib/server/outreach/outreach-service";
-import { getScoutRun, getScoutRunRecord } from "@/lib/server/scout-runner";
+import {
+  getPreviousCompletedScoutRunForMarket,
+  getScoutRun,
+  getScoutRunRecord
+} from "@/lib/server/scout-runner";
 
 export const dynamic = "force-dynamic";
 
@@ -26,9 +31,19 @@ export default async function RunPage({
   }
 
   const report = await getScoutRun(runId);
-  const [outreach, leadAnnotations] = report
-    ? await Promise.all([getOutreachWorkspaceState(runId), getLeadAnnotations(runId)])
-    : [null, []];
+  const [outreach, leadAnnotations, previousReport] = report
+    ? await Promise.all([
+        getOutreachWorkspaceState(runId),
+        getLeadAnnotations(runId),
+        report.status === "completed"
+          ? getPreviousCompletedScoutRunForMarket(record.input.rawQuery, record.createdAt)
+          : Promise.resolve(null)
+      ])
+    : [null, [], null];
+  const marketComparison =
+    report?.status === "completed" && previousReport
+      ? buildMarketComparison(report, previousReport)
+      : null;
 
   return (
     <AppFrame
@@ -55,7 +70,12 @@ export default async function RunPage({
       }
     >
       {report && outreach ? (
-        <ReportView leadAnnotations={leadAnnotations} outreach={outreach} report={report} />
+        <ReportView
+          leadAnnotations={leadAnnotations}
+          marketComparison={marketComparison}
+          outreach={outreach}
+          report={report}
+        />
       ) : (
         <RunStatusView record={record} />
       )}
