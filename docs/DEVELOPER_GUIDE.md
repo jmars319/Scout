@@ -23,7 +23,10 @@
 `pnpm run dev:all` starts the web app and worker together in one local shell session.
 `pnpm run dev:desktop` starts a local web server plus worker automatically, then opens the same Scout flow inside Electron.
 `pnpm run package:desktop` builds a local macOS desktop package under `dist/desktop` with ad-hoc signing when no Apple signing credentials are available.
+`pnpm run qa:desktop-install` installs the latest packaged app into `~/Applications`, verifies the app signature, starts the packaged runtime, checks database/schema readiness, and shuts it down.
 `pnpm run package:desktop:release` requires Developer ID signing and Apple notarization credentials, then builds release-ready macOS artifacts.
+`pnpm run check:desktop-release-env` checks release signing and notarization prerequisites without running the expensive package build.
+`pnpm run qa:operator` prints the manual operator QA checklist and current local artifact/install status.
 `pnpm run install:desktop` packages Scout, installs `Scout by JAMARQ.app` into `~/Applications`, seeds the packaged desktop `.env` file if needed, and opens the installed app.
 `pnpm run launch:desktop` opens the installed Scout app from `~/Applications` or falls back to the packaged build under `dist/desktop`.
 `pnpm run clean:local` prunes the desktop interactive-search browser caches without clearing the saved session.
@@ -54,7 +57,8 @@
   raw query
   normalized market plus location form
   singularized variant only when it is safely derivable
-  official-website/contact/domain-oriented variants when a location is present
+  official-website/contact/profile/domain-oriented variants when a location is present
+  unquoted local website/reviews variants to improve recall when exact quoted market terms are too narrow
 - URLs are canonicalized before final candidate selection.
 - Directory and profile snippets can surface lower-confidence extracted leads when Scout sees a business name inside a non-owned result.
 - Candidates are deduplicated before presence typing and audit.
@@ -188,6 +192,8 @@ Desktop startup also prunes cache-heavy folders inside that profile at most once
   Runs the same desktop shell against a local production Next.js server.
 - `pnpm run verify:desktop`
   Typechecks the desktop package and verifies the Electron runtime entrypoint can boot and exit cleanly.
+- `pnpm run qa:desktop-install`
+  Installs the current local package into `~/Applications`, verifies the app signature, launches the packaged runtime in QA mode, checks local database/schema readiness through the bundled web app, then shuts down without opening the operator window.
 - `pnpm run package:desktop`
   Builds a local macOS package that bundles:
   the production Next.js build
@@ -226,3 +232,5 @@ Desktop stays intentionally thin. It does not introduce a second product workflo
 Use `pnpm run package:desktop` for local builds and internal smoke testing. It can produce working artifacts without Apple credentials, but those artifacts are ad-hoc signed and are not suitable for public distribution.
 
 Use `pnpm run package:desktop:release` when preparing a public macOS build. The script intentionally fails before the expensive packaging step unless Developer ID signing and notarization credentials are present. After packaging, `check:release-artifacts` verifies the app bundle signature, Developer ID authority, and Gatekeeper assessment.
+
+See `docs/RELEASE_DISTRIBUTION.md` for the credential matrix and local-vs-release package commands.

@@ -66,6 +66,7 @@ export function createBaseEnv(baseUrl, localState) {
     SCOUT_RUNTIME_ROOT: repoRoot,
     SCOUT_DESKTOP_URL: baseUrl,
     SCOUT_DESKTOP_APP_NAME: "Scout by JAMARQ",
+    SCOUT_DESKTOP_ENV_FILE: path.resolve(repoRoot, ".env"),
     SCOUT_INTERACTIVE_SEARCH: "1",
     SCOUT_INTERACTIVE_SEARCH_PROFILE_DIR: localState.profileDir
   };
@@ -203,14 +204,16 @@ export async function ensureDesktopWebReadiness(baseUrl, options = {}) {
   const databaseUrlMessage = process.env.DATABASE_URL
     ? `\nDATABASE_URL: ${process.env.DATABASE_URL}`
     : "";
+  const setupHintMessage = payload?.setupHint ? `\nSetup hint: ${payload.setupHint}` : "";
 
   throw new Error(
     [
       "Scout desktop could not prepare local storage.",
       payload?.message ?? "The desktop readiness endpoint did not return a usable response.",
-      "Make sure local Postgres is running and that the `scout` database exists.",
-      "For a default Homebrew setup: `createdb scout` is usually enough after Postgres is started.",
-      `${envFileMessage}${databaseUrlMessage}`
+      payload?.setupHint
+        ? "Follow the setup hint below, then launch Scout again."
+        : "Make sure local Postgres is running and that the `scout` database exists.",
+      `${envFileMessage}${databaseUrlMessage}${setupHintMessage}`
     ]
       .filter(Boolean)
       .join("\n")

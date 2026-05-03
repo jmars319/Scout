@@ -80,6 +80,14 @@ export function buildQueryVariants(intent: ResolvedMarketIntent): SearchQueryVar
         query: normalizeWhitespace(`"${intent.marketTerm}" "${intent.locationLabel}" hours phone`)
       },
       {
+        label: "local_website_unquoted",
+        query: normalizeWhitespace(`${intent.marketTerm} ${intent.locationLabel} website`)
+      },
+      {
+        label: "reviews_website",
+        query: normalizeWhitespace(`${intent.marketTerm} ${intent.locationLabel} reviews website`)
+      },
+      {
         label: "service_area",
         query: normalizeWhitespace(`"${intent.marketTerm}" near "${intent.locationLabel}"`)
       },

@@ -53,6 +53,7 @@ const filterOptions: Array<{ value: LeadInboxFilter; label: string }> = [
 ];
 
 type LeadAction = "analyze_contact" | "generate_draft" | "mark_contacted";
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 function isClosed(state: LeadStatus): boolean {
   return state === "dismissed" || state === "not_a_fit";
@@ -75,6 +76,61 @@ function needsDraft(item: LeadInboxItem): boolean {
     !isClosed(item.annotation.state) &&
     item.annotation.state !== "contacted" &&
     !isReady(item)
+  );
+}
+
+function dayValue(value: string | undefined): number {
+  if (!value) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  return Date.parse(`${value.slice(0, 10)}T00:00:00.000Z`);
+}
+
+function daysSince(value: string, today: string): number {
+  return Math.max(0, Math.floor((dayValue(today) - dayValue(value)) / MS_PER_DAY));
+}
+
+function updatedAgeLabel(item: LeadInboxItem, today: string): string {
+  const age = daysSince(item.annotation.updatedAt, today);
+
+  if (age === 0) {
+    return "Updated today";
+  }
+
+  return `Updated ${age}d ago`;
+}
+
+function urgencyRank(item: LeadInboxItem, today: string): number {
+  if (isDue(item, today)) {
+    return 0;
+  }
+
+  if (isReady(item) && item.annotation.state !== "contacted") {
+    return 1;
+  }
+
+  if (needsDraft(item)) {
+    return 2;
+  }
+
+  if (item.annotation.state === "contacted") {
+    return 3;
+  }
+
+  if (item.annotation.state === "saved") {
+    return 4;
+  }
+
+  return 5;
+}
+
+function sortLeadInboxItems(left: LeadInboxItem, right: LeadInboxItem, today: string): number {
+  return (
+    urgencyRank(left, today) - urgencyRank(right, today) ||
+    dayValue(left.annotation.followUpDate) - dayValue(right.annotation.followUpDate) ||
+    (right.priorityScore ?? 0) - (left.priorityScore ?? 0) ||
+    right.annotation.updatedAt.localeCompare(left.annotation.updatedAt)
   );
 }
 
@@ -208,13 +264,20 @@ export function LeadInbox({
   }, [items, today]);
 
   const visibleItems = useMemo(
-    () =>
-      items.filter((item) => {
+    () => {
+      const filtered = items.filter((item) => {
         const itemKey = `${item.runId}:${item.candidateId}`;
         const isUnsaved = messageByKey[itemKey]?.text === "Unsaved";
         return (isUnsaved || matchesFilter(item, filter, today)) && matchesSearch(item, query);
-      }),
+      });
+
+      return filtered.sort((left, right) => sortLeadInboxItems(left, right, today));
+    },
     [filter, items, messageByKey, query, today]
+  );
+  const nextLead = useMemo(
+    () => visibleItems.find((item) => !isClosed(item.annotation.state)) ?? null,
+    [visibleItems]
   );
   const visibleKeys = useMemo(
     () => visibleItems.map((item) => `${item.runId}:${item.candidateId}`),
@@ -590,6 +653,34 @@ export function LeadInbox({
         ) : null}
       </div>
 
+      {nextLead ? (
+        <div className="lead-next-up">
+          <div>
+            <div className="tag-row">
+              <Tag tone={isDue(nextLead, today) ? "warn" : "good"}>Next Up</Tag>
+              <Tag>{nextLead.outreach.nextAction}</Tag>
+              <Tag>{updatedAgeLabel(nextLead, today)}</Tag>
+            </div>
+            <div className="lead-next-up-title">{nextLead.businessName}</div>
+            <div className="muted">{nextLead.marketTerm}</div>
+          </div>
+          <div className="lead-inbox-actions">
+            <Link
+              className="secondary-button"
+              href={`/leads/${encodeURIComponent(nextLead.runId)}/${encodeURIComponent(nextLead.candidateId)}`}
+            >
+              Details
+            </Link>
+            <Link
+              className="link-button"
+              href={`/runs/${encodeURIComponent(nextLead.runId)}#outreach-workspace`}
+            >
+              Outreach
+            </Link>
+          </div>
+        </div>
+      ) : null}
+
       {visibleItems.length > 0 ? (
         <ul className="lead-inbox-list">
           {visibleItems.map((item) => {
@@ -638,6 +729,7 @@ export function LeadInbox({
                     </Tag>
                     {item.shortlistRank ? <Tag tone="warn">Shortlist #{item.shortlistRank}</Tag> : null}
                     {item.priorityScore ? <Tag>{item.priorityScore} pts</Tag> : null}
+                    <Tag>{updatedAgeLabel(item, today)}</Tag>
                   </div>
                 </div>
 

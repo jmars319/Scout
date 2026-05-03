@@ -575,6 +575,24 @@ button[disabled] {
   min-width: 0;
 }
 
+.lead-next-up {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  min-width: 0;
+}
+
+.lead-next-up-title {
+  margin-top: 0.45rem;
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
 .lead-inbox-selection-summary,
 .lead-select-title,
 .lead-select-row {
@@ -753,6 +771,11 @@ button[disabled] {
   .lead-triage-actions,
   .lead-inbox-actions {
     justify-content: flex-start;
+  }
+
+  .lead-next-up {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .saved-market-actions {

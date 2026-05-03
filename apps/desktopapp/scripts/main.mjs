@@ -24,6 +24,7 @@ import {
 const appName = process.env.SCOUT_DESKTOP_APP_NAME || "Scout by JAMARQ";
 const verifyMode =
   process.argv.includes("--verify") || process.env.SCOUT_DESKTOP_VERIFY === "1";
+const packagedRuntimeVerifyMode = process.env.SCOUT_DESKTOP_RUNTIME_VERIFY === "1";
 let targetUrl = process.env.SCOUT_DESKTOP_URL;
 let runtimeRef = null;
 let shuttingDown = false;
@@ -115,6 +116,7 @@ async function startPackagedRuntime() {
     NEXT_PUBLIC_APP_URL: baseUrl,
     SCOUT_DESKTOP_APP_NAME: appName,
     SCOUT_DESKTOP_URL: baseUrl,
+    SCOUT_DESKTOP_ENV_FILE: envResult.envFilePath,
     SCOUT_INTERACTIVE_SEARCH: "1",
     SCOUT_INTERACTIVE_SEARCH_PROFILE_DIR: localState.profileDir,
     SCOUT_RUNTIME_ROOT: manifest.webappDirPath,
@@ -240,7 +242,7 @@ function createWindow() {
 }
 
 app.whenReady().then(async () => {
-  if (verifyMode) {
+  if (verifyMode && !packagedRuntimeVerifyMode) {
     console.log("Scout desktop runtime verified.");
     app.quit();
     return;
@@ -250,7 +252,17 @@ app.whenReady().then(async () => {
     if (app.isPackaged) {
       runtimeRef = await startPackagedRuntime();
       targetUrl = runtimeRef.baseUrl;
+
+      if (packagedRuntimeVerifyMode) {
+        console.log(`Scout packaged desktop runtime verified at ${targetUrl}.`);
+        await shutdownRuntime();
+        app.quit();
+        return;
+      }
+
       attachRuntimeExitHandlers();
+    } else if (packagedRuntimeVerifyMode) {
+      throw new Error("Packaged runtime verification must run from a packaged Scout app bundle.");
     }
 
     createWindow();

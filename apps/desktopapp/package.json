@@ -14,6 +14,7 @@
     "check:package": "node ./scripts/check-package-readiness.mjs",
     "check:release-env": "node ./scripts/check-release-env.mjs",
     "check:release-artifacts": "node ./scripts/check-release-artifacts.mjs",
+    "qa:install": "node ./scripts/qa-install-macos.mjs",
     "prepare:runtime": "node ./scripts/prepare-runtime.mjs",
     "dist:mac": "pnpm run build:icon && pnpm run prepare:runtime && electron-builder --mac dir dmg zip --publish never",
     "dist:mac:release": "pnpm run check:release-env && pnpm run dist:mac && pnpm run check:release-artifacts",

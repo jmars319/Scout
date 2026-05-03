@@ -56,6 +56,10 @@ if (packageJson.scripts?.["check:release-artifacts"] !== "node ./scripts/check-r
   fail("package.json must expose check:release-artifacts for post-package release validation.");
 }
 
+if (packageJson.scripts?.["qa:install"] !== "node ./scripts/qa-install-macos.mjs") {
+  fail("package.json must expose qa:install for packaged desktop install verification.");
+}
+
 requireArrayIncludes(buildConfig.files, "scripts/**/*", "Electron Builder files");
 requireArrayIncludes(macConfig.target, "dir", "mac targets");
 requireArrayIncludes(macConfig.target, "dmg", "mac targets");
@@ -91,11 +95,16 @@ if (!mainScript.includes("SCOUT_SCHEMA_PATH")) {
   fail("Packaged desktop runtime must pass SCOUT_SCHEMA_PATH to the web app and worker.");
 }
 
+if (!mainScript.includes("SCOUT_DESKTOP_RUNTIME_VERIFY")) {
+  fail("Packaged desktop runtime must support install QA verification mode.");
+}
+
 for (const relativePath of [
   "scripts/main.mjs",
   "scripts/prepare-runtime.mjs",
   "scripts/check-release-env.mjs",
   "scripts/check-release-artifacts.mjs",
+  "scripts/qa-install-macos.mjs",
   "scripts/lib/runtime.mjs",
   "scripts/lib/launcher.mjs",
   "scripts/lib/local-state.mjs"

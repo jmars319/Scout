@@ -9,7 +9,9 @@ export interface DatabaseReadiness {
   databaseUrl?: string | undefined;
   schemaReady: boolean;
   schemaPath?: string | undefined;
+  desktopEnvFile?: string | undefined;
   message: string;
+  setupHint?: string | undefined;
 }
 
 function resolveSchemaPath(): string {
@@ -38,6 +40,36 @@ async function applySchema(schemaPath: string): Promise<void> {
   await sql.unsafe(schema);
 }
 
+function getDesktopEnvFile(): string | undefined {
+  const envFilePath = process.env.SCOUT_DESKTOP_ENV_FILE?.trim();
+  return envFilePath || undefined;
+}
+
+function buildSetupHint(message: string): string {
+  const normalized = message.toLowerCase();
+
+  if (
+    normalized.includes("database") &&
+    (normalized.includes("does not exist") || normalized.includes("doesn't exist"))
+  ) {
+    return "Create the local Scout database with `createdb scout`, then launch Scout again.";
+  }
+
+  if (
+    normalized.includes("econnrefused") ||
+    normalized.includes("connection refused") ||
+    normalized.includes("connect enoent")
+  ) {
+    return "Start local Postgres, then launch Scout again. For Homebrew, `brew services start postgresql` is the usual path.";
+  }
+
+  if (normalized.includes("authentication") || normalized.includes("password")) {
+    return "Update the desktop env file with a DATABASE_URL that matches your local Postgres credentials.";
+  }
+
+  return "Confirm local Postgres is running, the `scout` database exists, and DATABASE_URL points at it.";
+}
+
 export async function checkDatabaseReadiness({
   ensureSchema = false
 }: {
@@ -51,7 +83,9 @@ export async function checkDatabaseReadiness({
       ok: false,
       schemaReady: false,
       schemaPath,
-      message: "DATABASE_URL is not set."
+      ...(getDesktopEnvFile() ? { desktopEnvFile: getDesktopEnvFile() } : {}),
+      message: "DATABASE_URL is not set.",
+      setupHint: "Set DATABASE_URL in the Scout desktop env file, or use the default `postgresql:///scout` after creating the local database."
     };
   }
 
@@ -73,17 +107,26 @@ export async function checkDatabaseReadiness({
       databaseUrl,
       schemaReady,
       schemaPath,
+      ...(getDesktopEnvFile() ? { desktopEnvFile: getDesktopEnvFile() } : {}),
       message: schemaReady
         ? "Scout local database is reachable and the schema is ready."
-        : "Scout database is reachable, but the schema has not been prepared."
+        : "Scout database is reachable, but the schema has not been prepared.",
+      ...(!schemaReady
+        ? { setupHint: "Run `pnpm run db:prepare`, or launch packaged Scout again so it can apply the bundled schema." }
+        : {})
     };
   } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unknown Scout database readiness failure.";
+
     return {
       ok: false,
       databaseUrl,
       schemaReady: false,
       schemaPath,
-      message: error instanceof Error ? error.message : "Unknown Scout database readiness failure."
+      ...(getDesktopEnvFile() ? { desktopEnvFile: getDesktopEnvFile() } : {}),
+      message,
+      setupHint: buildSetupHint(message)
     };
   }
 }

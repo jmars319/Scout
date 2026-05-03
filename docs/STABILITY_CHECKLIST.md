@@ -18,11 +18,14 @@
 - `pnpm run build:web`
 - `pnpm run verify:desktop`
 - `pnpm run package:desktop`
+- `pnpm run qa:desktop-install`
 - `pnpm run verify:mobile`
+- `pnpm run qa:operator`
 - `pnpm run doctor`
 
 ## Release-Only Command
 
+- `pnpm run check:desktop-release-env`
 - `pnpm run package:desktop:release`
 
 ## What They Guarantee
@@ -63,10 +66,16 @@
   Performs a fast, non-credential package-readiness check for the desktop bundle config, hardened runtime setting, required runtime resources, packaged schema readiness, and packaging entrypoints.
 - `package:desktop`
   Confirms Scout can build a local macOS desktop package with a bundled production web runtime, bundled worker entrypoint, and bundled Chromium assets.
+- `qa:desktop-install`
+  Confirms the latest local package can be installed into `~/Applications`, has a valid local signature, can start its packaged web runtime and worker, can reach/apply the local database schema, and can shut down cleanly without opening the operator window.
+- `check:desktop-release-env`
+  Confirms Developer ID signing and Apple notarization credentials are present before the release package build is attempted. This command is expected to fail on local-only machines.
 - `package:desktop:release`
   Confirms the release environment has Developer ID signing and Apple notarization credentials before building, then validates the built `.app` with `codesign` and Gatekeeper assessment. This command is expected to fail on machines that are only configured for local ad-hoc packages.
 - `verify:mobile`
   Confirms the remaining mobile scaffold does not break workspace integrity.
+- `qa:operator`
+  Prints the manual operator QA checklist and reports whether local desktop artifacts, the installed app, and the desktop env file are present.
 - `doctor`
   Prints Node version, checks env and package map, and confirms Playwright CLI availability in the web app.
 
