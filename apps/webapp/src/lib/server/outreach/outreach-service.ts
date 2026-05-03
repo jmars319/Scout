@@ -149,7 +149,7 @@ function buildSystemPrompt(
   profile: Awaited<ReturnType<typeof getOutreachProfile>>
 ): string {
   const lines = [
-    `You write restrained outreach drafts for ${profile.companyName || "Tenra"}.`,
+    `You write restrained outreach drafts for ${profile.companyName || "tenra"}.`,
     "Use only the evidence provided in the JSON input.",
     "Use the senderProfile object as the source of truth for who is reaching out, what they offer, and what next step they prefer.",
     "Use senderProfile.defaultCallToAction when a concrete next step is helpful, but omit it if the field is blank.",

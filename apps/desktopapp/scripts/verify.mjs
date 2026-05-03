@@ -9,7 +9,7 @@ const desktopDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".
 const electronEnv = {
   ...process.env,
   SCOUT_DESKTOP_VERIFY: "1",
-  SCOUT_DESKTOP_APP_NAME: "Tenra Scout"
+  SCOUT_DESKTOP_APP_NAME: "tenra Scout"
 };
 delete electronEnv.ELECTRON_RUN_AS_NODE;
 

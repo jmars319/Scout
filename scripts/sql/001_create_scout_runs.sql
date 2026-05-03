@@ -153,7 +153,7 @@ create table if not exists scout_outreach_profiles (
   profile_id text primary key,
   updated_at timestamptz not null,
   sender_name text not null default '',
-  company_name text not null default 'Tenra',
+  company_name text not null default 'tenra',
   role_title text not null default '',
   service_line text not null default '',
   service_summary text not null default '',
@@ -169,11 +169,8 @@ create table if not exists scout_outreach_profiles (
 
 alter table scout_outreach_profiles add column if not exists sender_name text not null default '';
 alter table scout_outreach_profiles add column if not exists updated_at timestamptz not null default now();
-alter table scout_outreach_profiles add column if not exists company_name text not null default 'Tenra';
-alter table scout_outreach_profiles alter column company_name set default 'Tenra';
-update scout_outreach_profiles
-set company_name = 'Tenra'
-where company_name = 'JAMARQ';
+alter table scout_outreach_profiles add column if not exists company_name text not null default 'tenra';
+alter table scout_outreach_profiles alter column company_name set default 'tenra';
 alter table scout_outreach_profiles add column if not exists role_title text not null default '';
 alter table scout_outreach_profiles add column if not exists service_line text not null default '';
 alter table scout_outreach_profiles add column if not exists service_summary text not null default '';

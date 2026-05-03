@@ -8,8 +8,8 @@ import { fileURLToPath } from "node:url";
 const desktopDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const repoRoot = path.resolve(desktopDir, "../..");
 
-export const appName = process.env.SCOUT_DESKTOP_APP_NAME || "Tenra Scout";
-const legacyAppNames = ["Scout by JAMARQ"];
+export const appName = process.env.SCOUT_DESKTOP_APP_NAME || "tenra Scout";
+const legacyAppNames = [];
 export const userApplicationsDirPath = path.resolve(os.homedir(), "Applications");
 export const systemApplicationsDirPath = "/Applications";
 export const distDesktopDirPath = path.resolve(repoRoot, "dist", "desktop");

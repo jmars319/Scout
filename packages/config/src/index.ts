@@ -1,6 +1,6 @@
 import type { OutreachLength, OutreachTone, ViewportKind } from "@scout/domain";
 
-export const APP_NAME = "Tenra Scout";
+export const APP_NAME = "tenra Scout";
 
 export interface ViewportPreset {
   kind: ViewportKind;

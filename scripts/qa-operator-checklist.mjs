@@ -6,16 +6,16 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const checklistPath = path.resolve(repoRoot, "docs", "OPERATOR_QA.md");
-const desktopAppPath = path.resolve(os.homedir(), "Applications", "Tenra Scout.app");
+const desktopAppPath = path.resolve(os.homedir(), "Applications", "tenra Scout.app");
 const desktopEnvPath = path.resolve(
   os.homedir(),
   "Library",
   "Application Support",
-  "Tenra Scout",
+  "tenra Scout",
   ".env"
 );
-const localDmgPath = path.resolve(repoRoot, "dist", "desktop", "Scout-0.1.0-arm64.dmg");
-const localZipPath = path.resolve(repoRoot, "dist", "desktop", "Scout-0.1.0-arm64.zip");
+const localDmgPath = path.resolve(repoRoot, "dist", "desktop", "tenra-scout-0.1.0-arm64.dmg");
+const localZipPath = path.resolve(repoRoot, "dist", "desktop", "tenra-scout-0.1.0-arm64.zip");
 
 async function exists(targetPath) {
   try {

@@ -113,7 +113,7 @@ try {
 
   const savedProfile = await profileRepository.saveDefault({
     senderName: "Jordan Marshall",
-    companyName: "Tenra",
+    companyName: "tenra",
     roleTitle: "Founder",
     serviceLine: "Website repairs and conversion improvements",
     serviceSummary: "I help small businesses fix broken website paths and make contact intent easier to act on.",
@@ -124,10 +124,10 @@ try {
     schedulerUrl: "https://cal.example/tenra",
     toneNotes: "Keep the note calm, brief, and useful.",
     avoidPhrases: ["just checking in", "synergy"],
-    signature: "Jordan Marshall\nTenra\njordan@tenra.example"
+    signature: "Jordan Marshall\ntenra\njordan@tenra.example"
   });
 
-  if (savedProfile.companyName !== "Tenra" || savedProfile.senderName !== "Jordan Marshall") {
+  if (savedProfile.companyName !== "tenra" || savedProfile.senderName !== "Jordan Marshall") {
     throw new Error("Scout did not persist the outreach profile.");
   }
 

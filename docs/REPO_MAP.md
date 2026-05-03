@@ -35,7 +35,7 @@
 ## Root Folders
 
 - `scripts`
-  Tenra Scout bootstrap, doctor, env, and package verification scripts.
+  tenra Scout bootstrap, doctor, env, and package verification scripts.
 - `docs`
   Product, repo, stability, and developer documentation.
 - `archive`

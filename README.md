@@ -1,6 +1,6 @@
-# Scout
+# tenra Scout
 
-Tenra Scout is a live-search market scanner that identifies, audits, and classifies business web presence to surface actionable opportunities.
+tenra Scout is a live-search market scanner that identifies, audits, and classifies business web presence to surface actionable opportunities.
 
 Scout is not a crawler, an SEO suite, or an AI-first app. The v1 product shape is intentionally narrow: input, run, report.
 
@@ -111,7 +111,7 @@ scout/
 - `pnpm run package:desktop:release`
   Requires Developer ID signing plus Apple notarization credentials, then builds the same macOS artifacts for release distribution. Supported notarization credential sets are `APPLE_API_KEY`/`APPLE_API_KEY_ID`/`APPLE_API_ISSUER`, `APPLE_ID`/`APPLE_APP_SPECIFIC_PASSWORD`/`APPLE_TEAM_ID`, or `APPLE_KEYCHAIN_PROFILE`.
 - `pnpm run install:desktop`
-  Builds the packaged macOS app, installs it into `~/Applications/Tenra Scout.app`, seeds `~/Library/Application Support/Tenra Scout/.env` if needed, and opens Scout like a normal Mac app.
+  Builds the packaged macOS app, installs it into `~/Applications/tenra Scout.app`, seeds `~/Library/Application Support/tenra Scout/.env` if needed, and opens Scout like a normal Mac app.
 - `pnpm run launch:desktop`
   Opens the installed Scout app from `~/Applications` when present, otherwise falls back to the packaged build under `dist/desktop`.
 - Desktop startup automatically prunes cache-heavy folders inside the interactive-search Chromium profile at most once per 24 hours. That keeps `.local` from growing indefinitely without throwing away the session state that helps DuckDuckGo and Google confirmation windows stay useful.
@@ -124,7 +124,7 @@ scout/
 - Completed report views now include a local outreach workspace for shortlist targets. Scout can inspect contact paths, recommend the best first channel, generate email plus short-form plus phone-ready copy, and save everything locally, but it still does not send outreach automatically.
 - The packaged macOS app runs its own bundled `next start` server, bundled worker runtime, and bundled Chromium for audits.
 - Desktop mode enables manual in-browser confirmation only for DuckDuckGo. If DuckDuckGo serves a human-check page, Scout can open a local browser-backed search window and continue after the operator clears it. Google is treated as fetch-only and simply degrades if it serves a challenge flow.
-- The packaged app still needs `DATABASE_URL`, but Scout now auto-creates `~/Library/Application Support/Tenra Scout/.env` on first packaged launch with `DATABASE_URL=postgresql:///scout` as the local default.
+- The packaged app still needs `DATABASE_URL`, but Scout now auto-creates `~/Library/Application Support/tenra Scout/.env` on first packaged launch with `DATABASE_URL=postgresql:///scout` as the local default.
 - Public macOS distribution should use `pnpm run package:desktop:release`, which fails before packaging if Developer ID signing or notarization credentials are missing.
 - If you prefer a one-step local install instead of opening bundles from `dist/desktop`, use `pnpm run install:desktop` once and then launch Scout from Spotlight, Launchpad, Finder, or the Dock like a normal Mac app.
 
