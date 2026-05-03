@@ -63,7 +63,11 @@ function shouldQueryProviderVariant(
   variantLabel: string
 ): boolean {
   if (provider.name === "bing_html" || provider.name === "google_html") {
-    return variantLabel === "raw" || variantLabel === "official_website";
+    return (
+      variantLabel === "raw" ||
+      variantLabel === "official_website" ||
+      variantLabel === "contact_path"
+    );
   }
 
   return true;
@@ -283,6 +287,10 @@ function getPreferenceScore(candidate: RawAcquisitionCandidate): number {
   }
 
   if (candidate.variantLabel === "raw") {
+    score += 2;
+  }
+
+  if (candidate.variantLabel === "local_profile" || candidate.variantLabel === "service_area") {
     score += 2;
   }
 

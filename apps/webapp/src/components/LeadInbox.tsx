@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import {
+  leadInboxBulkActionResponseSchema,
   leadAnnotationResponseSchema,
   leadInboxItemResponseSchema
 } from "@scout/api-contracts";
@@ -19,8 +20,13 @@ import {
   toneForLeadOutreachStatus,
   toneForLeadStatus
 } from "./lead-workflow-copy";
+import {
+  describeSampleQuality,
+  toneForSampleQuality
+} from "./sample-quality-copy";
 
 type LeadInboxFilter = "all" | "open" | "saved" | "contacted" | "closed" | "due";
+type LeadBulkAction = "mark_contacted" | "dismiss" | "mark_not_a_fit" | "set_follow_up";
 
 interface LeadMessage {
   text: string;
@@ -68,6 +74,18 @@ function matchesFilter(item: LeadInboxItem, filter: LeadInboxFilter, today: stri
   }
 
   return item.annotation.state === filter;
+}
+
+function dueLabel(item: LeadInboxItem, today: string): string {
+  if (!item.annotation.followUpDate) {
+    return "Due";
+  }
+
+  if (item.annotation.followUpDate < today) {
+    return "Overdue";
+  }
+
+  return "Due Today";
 }
 
 function matchesSearch(item: LeadInboxItem, query: string): boolean {
@@ -123,10 +141,15 @@ export function LeadInbox({
   today: string;
 }) {
   const [items, setItems] = useState(initialItems);
-  const [filter, setFilter] = useState<LeadInboxFilter>("all");
+  const [filter, setFilter] = useState<LeadInboxFilter>(() =>
+    initialItems.some((item) => isDue(item, today)) ? "due" : "all"
+  );
   const [query, setQuery] = useState("");
   const [pendingKey, setPendingKey] = useState<string | null>(null);
   const [messageByKey, setMessageByKey] = useState<Record<string, LeadMessage>>({});
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+  const [bulkFollowUpDate, setBulkFollowUpDate] = useState(today);
+  const [bulkMessage, setBulkMessage] = useState<LeadMessage | null>(null);
 
   const counts = useMemo(() => {
     return {
@@ -148,6 +171,16 @@ export function LeadInbox({
       }),
     [filter, items, messageByKey, query, today]
   );
+  const visibleKeys = useMemo(
+    () => visibleItems.map((item) => `${item.runId}:${item.candidateId}`),
+    [visibleItems]
+  );
+  const selectedItems = useMemo(
+    () => items.filter((item) => selectedKeys.has(`${item.runId}:${item.candidateId}`)),
+    [items, selectedKeys]
+  );
+  const selectedVisibleCount = visibleKeys.filter((key) => selectedKeys.has(key)).length;
+  const allVisibleSelected = visibleKeys.length > 0 && selectedVisibleCount === visibleKeys.length;
 
   function updateLead(
     item: LeadInboxItem,
@@ -168,13 +201,57 @@ export function LeadInbox({
   }
 
   function replaceLead(item: LeadInboxItem) {
+    replaceLeads([item]);
+  }
+
+  function replaceLeads(updatedItems: LeadInboxItem[]) {
+    const updatedByKey = new Map(
+      updatedItems.map((item) => [`${item.runId}:${item.candidateId}`, item])
+    );
+
     setItems((current) =>
-      current.map((currentItem) =>
-        currentItem.runId === item.runId && currentItem.candidateId === item.candidateId
-          ? item
-          : currentItem
+      current.map(
+        (currentItem) =>
+          updatedByKey.get(`${currentItem.runId}:${currentItem.candidateId}`) ?? currentItem
       )
     );
+  }
+
+  function toggleSelected(item: LeadInboxItem) {
+    const itemKey = `${item.runId}:${item.candidateId}`;
+
+    setSelectedKeys((current) => {
+      const next = new Set(current);
+      if (next.has(itemKey)) {
+        next.delete(itemKey);
+      } else {
+        next.add(itemKey);
+      }
+
+      return next;
+    });
+  }
+
+  function toggleVisibleSelection() {
+    setSelectedKeys((current) => {
+      const next = new Set(current);
+
+      if (allVisibleSelected) {
+        for (const key of visibleKeys) {
+          next.delete(key);
+        }
+      } else {
+        for (const key of visibleKeys) {
+          next.add(key);
+        }
+      }
+
+      return next;
+    });
+  }
+
+  function clearSelection() {
+    setSelectedKeys(new Set());
   }
 
   async function saveLead(item: LeadInboxItem) {
@@ -227,6 +304,59 @@ export function LeadInbox({
       ...current,
       [itemKey]: { text: "Saved", tone: "good" }
     }));
+    setPendingKey(null);
+  }
+
+  async function runBulkAction(action: LeadBulkAction) {
+    if (pendingKey || selectedItems.length === 0) {
+      return;
+    }
+
+    const actionKey = `bulk:${action}`;
+    setPendingKey(actionKey);
+    setBulkMessage({
+      text:
+        action === "mark_contacted"
+          ? "Marking selected leads contacted..."
+          : action === "dismiss"
+            ? "Dismissing selected leads..."
+            : action === "mark_not_a_fit"
+              ? "Closing selected leads..."
+              : "Saving selected follow-ups...",
+      tone: "neutral"
+    });
+
+    const response = await fetch("/api/leads/bulk-actions", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        items: selectedItems.map((item) => ({
+          runId: item.runId,
+          candidateId: item.candidateId
+        })),
+        action:
+          action === "set_follow_up"
+            ? { action, followUpDate: bulkFollowUpDate || null }
+            : { action }
+      })
+    });
+
+    if (!response.ok) {
+      const errorMessage = await readErrorMessage(response);
+      setBulkMessage({ text: errorMessage, tone: "danger" });
+      setPendingKey(null);
+      return;
+    }
+
+    const body = leadInboxBulkActionResponseSchema.parse(await response.json());
+    replaceLeads(body.items);
+    setBulkMessage({
+      text: `Updated ${body.items.length} selected lead${body.items.length === 1 ? "" : "s"}`,
+      tone: "good"
+    });
+    clearSelection();
     setPendingKey(null);
   }
 
@@ -339,11 +469,86 @@ export function LeadInbox({
         </div>
       </div>
 
+      <div className="lead-inbox-bulk-bar">
+        <div className="lead-inbox-selection-summary">
+          <label className="lead-select-row">
+            <input
+              checked={allVisibleSelected}
+              disabled={visibleItems.length === 0 || Boolean(pendingKey)}
+              onChange={toggleVisibleSelection}
+              type="checkbox"
+            />
+            <span>{allVisibleSelected ? "Clear Visible" : "Select Visible"}</span>
+          </label>
+          <span className="muted">
+            {selectedItems.length} selected
+            {filter === "due" && counts.due > 0 ? ` from the due queue` : ""}
+          </span>
+          {selectedItems.length > 0 ? (
+            <button
+              className="secondary-button"
+              disabled={Boolean(pendingKey)}
+              onClick={clearSelection}
+              type="button"
+            >
+              Clear
+            </button>
+          ) : null}
+        </div>
+
+        <div className="lead-inbox-actions">
+          <input
+            aria-label="Bulk follow-up date"
+            className="draft-input bulk-date-input"
+            disabled={Boolean(pendingKey)}
+            onChange={(event) => setBulkFollowUpDate(event.target.value)}
+            type="date"
+            value={bulkFollowUpDate}
+          />
+          <button
+            className="secondary-button"
+            disabled={Boolean(pendingKey) || selectedItems.length === 0 || !bulkFollowUpDate}
+            onClick={() => void runBulkAction("set_follow_up")}
+            type="button"
+          >
+            {pendingKey === "bulk:set_follow_up" ? "Saving..." : "Set Follow-up"}
+          </button>
+          <button
+            className="secondary-button"
+            disabled={Boolean(pendingKey) || selectedItems.length === 0}
+            onClick={() => void runBulkAction("mark_contacted")}
+            type="button"
+          >
+            {pendingKey === "bulk:mark_contacted" ? "Marking..." : "Mark Contacted"}
+          </button>
+          <button
+            className="secondary-button"
+            disabled={Boolean(pendingKey) || selectedItems.length === 0}
+            onClick={() => void runBulkAction("dismiss")}
+            type="button"
+          >
+            {pendingKey === "bulk:dismiss" ? "Dismissing..." : "Dismiss"}
+          </button>
+          <button
+            className="secondary-button"
+            disabled={Boolean(pendingKey) || selectedItems.length === 0}
+            onClick={() => void runBulkAction("mark_not_a_fit")}
+            type="button"
+          >
+            {pendingKey === "bulk:mark_not_a_fit" ? "Closing..." : "Not a Fit"}
+          </button>
+        </div>
+        {bulkMessage ? (
+          <span className={`status-note ${bulkMessage.tone}`}>{bulkMessage.text}</span>
+        ) : null}
+      </div>
+
       {visibleItems.length > 0 ? (
         <ul className="lead-inbox-list">
           {visibleItems.map((item) => {
             const itemKey = `${item.runId}:${item.candidateId}`;
             const message = messageByKey[itemKey];
+            const selected = selectedKeys.has(itemKey);
             const saveBusy = pendingKey === `${itemKey}:save`;
             const analyzeBusy = pendingKey === `${itemKey}:analyze_contact`;
             const generateBusy = pendingKey === `${itemKey}:generate_draft`;
@@ -359,19 +564,28 @@ export function LeadInbox({
             return (
               <li className="report-card lead-inbox-card" key={itemKey}>
                 <div className="lead-inbox-card-head">
-                  <div className="lead-inbox-title">
-                    <div style={{ fontSize: "1.08rem", fontWeight: 700 }}>{item.businessName}</div>
-                    {item.primaryUrl ? (
-                      <a className="inline-link" href={item.primaryUrl} target="_blank">
-                        {item.primaryUrl}
-                      </a>
-                    ) : null}
+                  <div className="lead-select-title">
+                    <input
+                      aria-label={`Select ${item.businessName}`}
+                      checked={selected}
+                      disabled={Boolean(pendingKey)}
+                      onChange={() => toggleSelected(item)}
+                      type="checkbox"
+                    />
+                    <div className="lead-inbox-title">
+                      <div style={{ fontSize: "1.08rem", fontWeight: 700 }}>{item.businessName}</div>
+                      {item.primaryUrl ? (
+                        <a className="inline-link" href={item.primaryUrl} target="_blank">
+                          {item.primaryUrl}
+                        </a>
+                      ) : null}
+                    </div>
                   </div>
                   <div className="tag-row">
                     <Tag tone={toneForLeadStatus(item.annotation.state)}>
                       {labelForLeadStatus(item.annotation.state)}
                     </Tag>
-                    {isDue(item, today) ? <Tag tone="warn">Due</Tag> : null}
+                    {isDue(item, today) ? <Tag tone="warn">{dueLabel(item, today)}</Tag> : null}
                     <Tag tone={toneForLeadOutreachStatus(item.outreach.status)}>
                       {labelForLeadOutreachStatus(item.outreach.status)}
                     </Tag>
@@ -393,6 +607,11 @@ export function LeadInbox({
                     {item.presenceType ? <Tag>{humanizeLeadValue(item.presenceType)}</Tag> : null}
                     {item.presenceQuality ? <Tag>{humanizeLeadValue(item.presenceQuality)}</Tag> : null}
                     {item.confidence ? <Tag>{humanizeLeadValue(item.confidence)}</Tag> : null}
+                    {item.sampleQuality ? (
+                      <Tag tone={toneForSampleQuality(item.sampleQuality)}>
+                        {describeSampleQuality(item.sampleQuality)}
+                      </Tag>
+                    ) : null}
                     <Tag>{item.findingCount} findings</Tag>
                     {item.highSeverityFindings > 0 ? (
                       <Tag tone="danger">{item.highSeverityFindings} high severity</Tag>

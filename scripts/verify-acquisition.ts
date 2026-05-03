@@ -56,6 +56,8 @@ async function main(): Promise<void> {
   assert(variants.some((variant) => variant.label === "singularized"));
   assert(variants.some((variant) => variant.label === "official_website"));
   assert(variants.some((variant) => variant.label === "contact_path"));
+  assert(variants.some((variant) => variant.label === "local_profile"));
+  assert(variants.some((variant) => variant.label === "service_area"));
   assert(variants.some((variant) => variant.label === "owned_domain"));
   assert.equal(
     evaluatePresenceUrl({

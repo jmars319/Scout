@@ -11,6 +11,7 @@
     "start": "node ./scripts/start.mjs",
     "build": "tsc -p tsconfig.json --noEmit",
     "build:icon": "node ./scripts/build-icon.mjs",
+    "check:package": "node ./scripts/check-package-readiness.mjs",
     "check:release-env": "node ./scripts/check-release-env.mjs",
     "prepare:runtime": "node ./scripts/prepare-runtime.mjs",
     "dist:mac": "pnpm run build:icon && pnpm run prepare:runtime && electron-builder --mac dir dmg zip --publish never",
@@ -18,7 +19,7 @@
     "install:mac": "pnpm run dist:mac && node ./scripts/install-macos.mjs",
     "launch:mac": "node ./scripts/launch-macos.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "verify": "pnpm run build && node ./scripts/verify.mjs"
+    "verify": "pnpm run build && pnpm run check:package && node ./scripts/verify.mjs"
   },
   "dependencies": {
     "@scout/config": "workspace:*"

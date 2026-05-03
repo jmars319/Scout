@@ -59,6 +59,11 @@ export const leadInboxItemResponseSchema = z.object({
   errorMessage: z.string().optional()
 });
 
+const leadInboxActionTargetSchema = z.object({
+  runId: z.string().min(1),
+  candidateId: z.string().min(1)
+});
+
 export const leadInboxActionRequestSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("analyze_contact")
@@ -75,6 +80,33 @@ export const leadInboxActionRequestSchema = z.discriminatedUnion("action", [
       .optional()
   })
 ]);
+
+export const leadInboxBulkActionRequestSchema = z.object({
+  items: z.array(leadInboxActionTargetSchema).min(1).max(100),
+  action: z.discriminatedUnion("action", [
+    z.object({
+      action: z.literal("mark_contacted"),
+      followUpDate: z
+        .union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/), z.null()])
+        .optional()
+    }),
+    z.object({
+      action: z.literal("dismiss")
+    }),
+    z.object({
+      action: z.literal("mark_not_a_fit")
+    }),
+    z.object({
+      action: z.literal("set_follow_up"),
+      followUpDate: z.union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/), z.null()])
+    })
+  ])
+});
+
+export const leadInboxBulkActionResponseSchema = z.object({
+  items: z.array(leadInboxItemSchema).default([]),
+  errorMessage: z.string().optional()
+});
 
 export const createOutreachDraftRequestSchema = z.object({
   candidateId: z.string(),
@@ -136,6 +168,8 @@ export type LeadAnnotationResponse = z.infer<typeof leadAnnotationResponseSchema
 export type ListLeadInboxResponse = z.infer<typeof listLeadInboxResponseSchema>;
 export type LeadInboxItemResponse = z.infer<typeof leadInboxItemResponseSchema>;
 export type LeadInboxActionRequest = z.infer<typeof leadInboxActionRequestSchema>;
+export type LeadInboxBulkActionRequest = z.infer<typeof leadInboxBulkActionRequestSchema>;
+export type LeadInboxBulkActionResponse = z.infer<typeof leadInboxBulkActionResponseSchema>;
 export type CreateOutreachDraftRequest = z.infer<typeof createOutreachDraftRequestSchema>;
 export type UpdateOutreachDraftRequest = z.infer<typeof updateOutreachDraftRequestSchema>;
 export type ListOutreachDraftsResponse = z.infer<typeof listOutreachDraftsResponseSchema>;

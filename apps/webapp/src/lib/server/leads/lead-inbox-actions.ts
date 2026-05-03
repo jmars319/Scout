@@ -1,4 +1,4 @@
-import type { LeadInboxItem, OutreachLength, OutreachTone } from "@scout/domain";
+import type { LeadInboxItem, LeadStatus, OutreachLength, OutreachTone } from "@scout/domain";
 
 import {
   analyzeOutreachCandidate,
@@ -17,6 +17,17 @@ export type LeadInboxAction =
     }
   | { action: "mark_contacted"; followUpDate?: string | null | undefined };
 
+export type LeadInboxBulkAction =
+  | { action: "mark_contacted"; followUpDate?: string | null | undefined }
+  | { action: "dismiss" }
+  | { action: "mark_not_a_fit" }
+  | { action: "set_follow_up"; followUpDate: string | null };
+
+export interface LeadInboxActionTarget {
+  runId: string;
+  candidateId: string;
+}
+
 function addDaysIsoDate(date: Date, days: number): string {
   const next = new Date(date);
   next.setUTCDate(next.getUTCDate() + days);
@@ -33,16 +44,39 @@ async function requireLeadInboxItem(runId: string, candidateId: string): Promise
   return item;
 }
 
-async function markLeadContacted(
-  runId: string,
-  candidateId: string,
-  followUpDate: string | null | undefined
-): Promise<void> {
+async function getExistingAnnotation(runId: string, candidateId: string) {
   const existing = await createLeadAnnotationRepository().get(runId, candidateId);
 
   if (!existing) {
     throw new Error("Lead annotation not found.");
   }
+
+  return existing;
+}
+
+async function updateLeadAnnotation(input: {
+  runId: string;
+  candidateId: string;
+  state?: LeadStatus | undefined;
+  followUpDate?: string | null | undefined;
+}): Promise<void> {
+  const existing = await getExistingAnnotation(input.runId, input.candidateId);
+
+  await saveLeadAnnotation({
+    runId: input.runId,
+    candidateId: input.candidateId,
+    state: input.state ?? existing.state,
+    operatorNote: existing.operatorNote,
+    followUpDate: input.followUpDate === undefined ? existing.followUpDate : input.followUpDate
+  });
+}
+
+async function markLeadContacted(
+  runId: string,
+  candidateId: string,
+  followUpDate: string | null | undefined
+): Promise<void> {
+  const existing = await getExistingAnnotation(runId, candidateId);
 
   await saveLeadAnnotation({
     runId,
@@ -52,6 +86,23 @@ async function markLeadContacted(
     followUpDate:
       followUpDate === undefined ? existing.followUpDate ?? addDaysIsoDate(new Date(), 7) : followUpDate
   });
+}
+
+function uniqueTargets(targets: LeadInboxActionTarget[]): LeadInboxActionTarget[] {
+  const seen = new Set<string>();
+  const unique: LeadInboxActionTarget[] = [];
+
+  for (const target of targets) {
+    const key = `${target.runId}:${target.candidateId}`;
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    unique.push(target);
+  }
+
+  return unique;
 }
 
 export async function runLeadInboxAction(input: {
@@ -80,4 +131,48 @@ export async function runLeadInboxAction(input: {
   }
 
   return requireLeadInboxItem(input.runId, input.candidateId);
+}
+
+export async function runLeadInboxBulkAction(input: {
+  items: LeadInboxActionTarget[];
+  action: LeadInboxBulkAction;
+}): Promise<LeadInboxItem[]> {
+  const targets = uniqueTargets(input.items);
+
+  for (const target of targets) {
+    if (input.action.action === "mark_contacted") {
+      await markLeadContacted(target.runId, target.candidateId, input.action.followUpDate);
+      continue;
+    }
+
+    if (input.action.action === "dismiss") {
+      await updateLeadAnnotation({
+        runId: target.runId,
+        candidateId: target.candidateId,
+        state: "dismissed",
+        followUpDate: null
+      });
+      continue;
+    }
+
+    if (input.action.action === "mark_not_a_fit") {
+      await updateLeadAnnotation({
+        runId: target.runId,
+        candidateId: target.candidateId,
+        state: "not_a_fit",
+        followUpDate: null
+      });
+      continue;
+    }
+
+    await updateLeadAnnotation({
+      runId: target.runId,
+      candidateId: target.candidateId,
+      followUpDate: input.action.followUpDate
+    });
+  }
+
+  return Promise.all(
+    targets.map((target) => requireLeadInboxItem(target.runId, target.candidateId))
+  );
 }

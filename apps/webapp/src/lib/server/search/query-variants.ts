@@ -76,6 +76,14 @@ export function buildQueryVariants(intent: ResolvedMarketIntent): SearchQueryVar
         query: normalizeWhitespace(`"${intent.marketTerm}" "${intent.locationLabel}" contact`)
       },
       {
+        label: "local_profile",
+        query: normalizeWhitespace(`"${intent.marketTerm}" "${intent.locationLabel}" hours phone`)
+      },
+      {
+        label: "service_area",
+        query: normalizeWhitespace(`"${intent.marketTerm}" near "${intent.locationLabel}"`)
+      },
+      {
         label: "owned_domain",
         query: normalizeWhitespace(`site:*.com "${intent.marketTerm}" "${intent.locationLabel}"`)
       }

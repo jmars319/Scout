@@ -27,6 +27,7 @@
     "build:web": "pnpm --filter @scout/webapp build",
     "build:desktop": "pnpm --filter @scout/desktopapp build",
     "build:mobile": "pnpm --filter @scout/mobileapp build",
+    "check:desktop-package": "pnpm --filter @scout/desktopapp run check:package",
     "package:desktop": "pnpm --filter @scout/desktopapp run dist:mac",
     "package:desktop:release": "pnpm --filter @scout/desktopapp run dist:mac:release",
     "lint": "pnpm exec eslint .",

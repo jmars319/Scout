@@ -380,6 +380,26 @@ select {
   min-width: 0;
 }
 
+.sample-decision-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.sample-decision-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.35rem;
+  padding: 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-strong);
+  color: var(--muted);
+  font-size: 0.88rem;
+  min-width: 0;
+}
+
 .candidate-review,
 .candidate-review-form,
 .candidate-review-list {
@@ -457,6 +477,45 @@ button[disabled] {
   gap: 0.6rem;
 }
 
+.lead-inbox-bulk-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.7rem;
+  padding: 0.8rem 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  min-width: 0;
+}
+
+.lead-inbox-selection-summary,
+.lead-select-title,
+.lead-select-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.lead-select-title {
+  align-items: flex-start;
+}
+
+.lead-select-row {
+  font-weight: 700;
+}
+
+.lead-select-row input,
+.lead-select-title input {
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
+  margin-top: 0.12rem;
+}
+
+.bulk-date-input {
+  max-width: 12rem;
+}
+
 .lead-triage-list,
 .lead-inbox-list {
   margin: 0;
@@ -530,6 +589,7 @@ button[disabled] {
 @media (max-width: 820px) {
   .candidate-review-fields,
   .candidate-review-row,
+  .sample-decision-grid,
   .lead-triage-controls,
   .lead-inbox-search,
   .lead-inbox-meta,
@@ -542,6 +602,14 @@ button[disabled] {
   .lead-triage-actions,
   .lead-inbox-actions {
     justify-content: flex-start;
+  }
+
+  .lead-inbox-selection-summary {
+    flex-wrap: wrap;
+  }
+
+  .bulk-date-input {
+    max-width: none;
   }
 }
 

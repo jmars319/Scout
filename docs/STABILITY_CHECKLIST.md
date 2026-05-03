@@ -50,7 +50,9 @@
 - `build:web`
   Confirms the active Next.js app builds successfully.
 - `verify:desktop`
-  Confirms the desktop package typechecks and that Electron can launch Scout's desktop runtime entrypoint.
+  Confirms the desktop package typechecks, validates the Electron Builder package settings, and verifies Electron can launch Scout's desktop runtime entrypoint.
+- `check:desktop-package`
+  Performs a fast, non-credential package-readiness check for the desktop bundle config, required runtime resources, and packaging entrypoints.
 - `package:desktop`
   Confirms Scout can build a local macOS desktop package with a bundled production web runtime, bundled worker entrypoint, and bundled Chromium assets.
 - `package:desktop:release`

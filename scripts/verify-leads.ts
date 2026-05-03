@@ -8,7 +8,10 @@ import {
   buildLeadExport,
   buildLeadInboxExport
 } from "../apps/webapp/src/lib/server/leads/lead-export-service.ts";
-import { runLeadInboxAction } from "../apps/webapp/src/lib/server/leads/lead-inbox-actions.ts";
+import {
+  runLeadInboxAction,
+  runLeadInboxBulkAction
+} from "../apps/webapp/src/lib/server/leads/lead-inbox-actions.ts";
 import {
   filterLeadInboxItems,
   listLeadInboxItems
@@ -432,6 +435,42 @@ try {
   assert.match(inboxMarkdownExport.body, /# Scout Lead Inbox/);
   assert.match(inboxMarkdownExport.body, /Second lead is due for owner follow-up\./);
   assert.match(inboxMarkdownExport.body, /Follow up/);
+  assert.match(inboxMarkdownExport.body, /Sample quality/);
+
+  const bulkFollowUpItems = await runLeadInboxBulkAction({
+    items: [
+      {
+        runId,
+        candidateId
+      },
+      {
+        runId: secondRunId,
+        candidateId: secondCandidateId
+      }
+    ],
+    action: {
+      action: "set_follow_up",
+      followUpDate: "2026-05-09"
+    }
+  });
+  assert.equal(bulkFollowUpItems.length, 2);
+  assert(
+    bulkFollowUpItems.every((item) => item.annotation.followUpDate === "2026-05-09")
+  );
+
+  const bulkDismissedItems = await runLeadInboxBulkAction({
+    items: [
+      {
+        runId,
+        candidateId
+      }
+    ],
+    action: {
+      action: "dismiss"
+    }
+  });
+  assert.equal(bulkDismissedItems[0]?.annotation.state, "dismissed");
+  assert.equal(bulkDismissedItems[0]?.annotation.followUpDate, undefined);
 
   console.log("Lead workflow verification passed.");
 } finally {

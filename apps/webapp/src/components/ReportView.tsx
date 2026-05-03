@@ -77,6 +77,14 @@ function describeQueryVariantLabel(label: string): string {
     return "Contact Path";
   }
 
+  if (label === "local_profile") {
+    return "Hours/Phone";
+  }
+
+  if (label === "service_area") {
+    return "Near Location";
+  }
+
   if (label === "owned_domain") {
     return "Owned Domain";
   }
@@ -281,6 +289,60 @@ function buildSampleConfidenceReasons(report: ScoutRunReport): string[] {
     : [describeSampleQualityMeaning(report.acquisition.sampleQuality)];
 }
 
+function formatPercent(value: number): string {
+  return `${Math.round(value * 100)}%`;
+}
+
+function buildSampleDecisionRows(report: ScoutRunReport): Array<{
+  label: string;
+  value: string;
+  tone: "neutral" | "good" | "warn" | "danger";
+}> {
+  const selectedCount = Math.max(report.acquisition.selectedCandidateCount, 0);
+  const liveRatio =
+    selectedCount > 0 ? report.acquisition.liveCandidateCount / selectedCount : 0;
+  const fallbackRatio =
+    selectedCount > 0 ? report.acquisition.fallbackCandidateCount / selectedCount : 0;
+  const lowSignalCount = report.businessBreakdowns.filter((business) =>
+    ["facebook_only", "yelp_only", "directory_only", "marketplace", "unknown"].includes(
+      business.presenceType
+    )
+  ).length;
+  const lowSignalRatio =
+    selectedCount > 0 ? lowSignalCount / Math.max(selectedCount, report.businessBreakdowns.length) : 0;
+  const degradedAttempts = report.acquisition.providerAttempts.filter(
+    (attempt) => attempt.kind === "live" && attempt.outcome !== "success" && attempt.outcome !== "empty"
+  ).length;
+
+  return [
+    {
+      label: "Kept candidates",
+      value: String(selectedCount),
+      tone: selectedCount >= 10 ? "good" : selectedCount >= 5 ? "neutral" : "warn"
+    },
+    {
+      label: "Live share",
+      value: formatPercent(liveRatio),
+      tone: liveRatio >= 0.75 ? "good" : liveRatio >= 0.5 ? "neutral" : "warn"
+    },
+    {
+      label: "Fallback share",
+      value: formatPercent(fallbackRatio),
+      tone: fallbackRatio === 0 ? "good" : fallbackRatio < 0.4 ? "warn" : "danger"
+    },
+    {
+      label: "Low-signal share",
+      value: formatPercent(lowSignalRatio),
+      tone: lowSignalRatio <= 0.35 ? "good" : lowSignalRatio < 0.5 ? "warn" : "danger"
+    },
+    {
+      label: "Provider issues",
+      value: String(degradedAttempts),
+      tone: degradedAttempts === 0 ? "good" : "warn"
+    }
+  ];
+}
+
 function groupFindings(findings: AuditFinding[]): Map<string, AuditFinding[]> {
   const grouped = new Map<string, AuditFinding[]>();
 
@@ -407,6 +469,7 @@ export function ReportView({
     (attempt) => attempt.kind === "live" && attempt.outcome !== "success"
   );
   const sampleConfidenceReasons = buildSampleConfidenceReasons(report);
+  const sampleDecisionRows = buildSampleDecisionRows(report);
   const candidatesById = new Map(report.candidates.map((candidate) => [candidate.candidateId, candidate]));
   const leadTriageItems = buildLeadTriageItems(report, leadAnnotations);
 
@@ -510,6 +573,14 @@ export function ReportView({
                 <li key={buildListKey("sample-confidence-reason", index)}>{reason}</li>
               ))}
             </ul>
+            <div className="sample-decision-grid">
+              {sampleDecisionRows.map((row) => (
+                <div className="sample-decision-row" key={row.label}>
+                  <span>{row.label}</span>
+                  <Tag tone={row.tone}>{row.value}</Tag>
+                </div>
+              ))}
+            </div>
           </div>
 
           <p className="muted" style={{ marginTop: 0, lineHeight: 1.65 }}>
