@@ -1,6 +1,6 @@
 # Product Overview
 
-Scout by JAMARQ is a search-seeded market scanner for business web presence.
+Tenra Scout is a search-seeded market scanner for business web presence.
 
 The product loop is:
 

@@ -2,8 +2,8 @@
   "name": "@scout/desktopapp",
   "private": true,
   "version": "0.1.0",
-  "description": "Scout desktop shell for JAMARQ's deterministic web presence market scanner.",
-  "author": "JAMARQ",
+  "description": "Scout desktop shell for Tenra's deterministic web presence market scanner.",
+  "author": "Tenra",
   "type": "module",
   "main": "./scripts/main.mjs",
   "scripts": {
@@ -32,8 +32,8 @@
     "esbuild": "^0.25.12"
   },
   "build": {
-    "appId": "co.jamarq.scout.desktop",
-    "productName": "Scout by JAMARQ",
+    "appId": "co.tenra.scout.desktop",
+    "productName": "Tenra Scout",
     "artifactName": "Scout-${version}-${arch}.${ext}",
     "directories": {
       "output": "../../dist/desktop",

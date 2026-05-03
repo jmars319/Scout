@@ -127,7 +127,7 @@ export function OutreachProfileForm({
               className="draft-input"
               id="company-name"
               onChange={(event) => updateField("companyName", event.target.value)}
-              placeholder="JAMARQ"
+              placeholder="Tenra"
               value={profile.companyName}
             />
           </div>

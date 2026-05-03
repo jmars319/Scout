@@ -8,7 +8,7 @@ import {
 const DEFAULT_OUTREACH_PROFILE: OutreachProfile = {
   profileId: "default",
   senderName: "",
-  companyName: "JAMARQ",
+  companyName: "Tenra",
   roleTitle: "",
   serviceLine: "",
   serviceSummary: "",

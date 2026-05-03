@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { constants, existsSync } from "node:fs";
-import { access, mkdir, readdir, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -8,7 +8,8 @@ import { fileURLToPath } from "node:url";
 const desktopDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const repoRoot = path.resolve(desktopDir, "../..");
 
-export const appName = process.env.SCOUT_DESKTOP_APP_NAME || "Scout by JAMARQ";
+export const appName = process.env.SCOUT_DESKTOP_APP_NAME || "Tenra Scout";
+const legacyAppNames = ["Scout by JAMARQ"];
 export const userApplicationsDirPath = path.resolve(os.homedir(), "Applications");
 export const systemApplicationsDirPath = "/Applications";
 export const distDesktopDirPath = path.resolve(repoRoot, "dist", "desktop");
@@ -137,6 +138,26 @@ export async function ensurePackagedUserEnvFile({
     };
   }
 
+  for (const legacyName of legacyAppNames) {
+    const legacyEnvFilePath = getPackagedEnvFilePath(legacyName);
+    if (!existsSync(legacyEnvFilePath)) {
+      continue;
+    }
+
+    const legacyEnv = await readFile(legacyEnvFilePath, "utf8");
+    const nextEnv = legacyEnv.includes("APP_NAME=")
+      ? legacyEnv.replace(/^APP_NAME=.*$/m, `APP_NAME=${name}`)
+      : `APP_NAME=${name}\n${legacyEnv}`;
+    await writeFile(envFilePath, nextEnv);
+    logger.log(`Migrated Scout desktop env file from ${legacyEnvFilePath} to ${envFilePath}.`);
+
+    return {
+      envFilePath,
+      created: true,
+      migratedFrom: legacyEnvFilePath
+    };
+  }
+
   await writeFile(envFilePath, buildDefaultPackagedEnvTemplate(name));
   logger.log(`Created Scout desktop env file at ${envFilePath}.`);
 
@@ -180,6 +201,12 @@ export async function installPackagedApp({
     recursive: true,
     force: true
   });
+  for (const legacyName of legacyAppNames) {
+    await rm(getInstalledAppPath(installDirPath, legacyName), {
+      recursive: true,
+      force: true
+    });
+  }
   await run("/usr/bin/ditto", [sourceAppPath, targetAppPath], {
     stdio: "inherit"
   });

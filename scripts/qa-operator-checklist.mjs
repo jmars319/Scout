@@ -6,12 +6,12 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const checklistPath = path.resolve(repoRoot, "docs", "OPERATOR_QA.md");
-const desktopAppPath = path.resolve(os.homedir(), "Applications", "Scout by JAMARQ.app");
+const desktopAppPath = path.resolve(os.homedir(), "Applications", "Tenra Scout.app");
 const desktopEnvPath = path.resolve(
   os.homedir(),
   "Library",
   "Application Support",
-  "Scout by JAMARQ",
+  "Tenra Scout",
   ".env"
 );
 const localDmgPath = path.resolve(repoRoot, "dist", "desktop", "Scout-0.1.0-arm64.dmg");

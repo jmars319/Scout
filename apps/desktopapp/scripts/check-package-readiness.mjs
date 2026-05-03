@@ -32,12 +32,12 @@ if (packageJson.main !== "./scripts/main.mjs") {
   fail("package.json main must point at ./scripts/main.mjs.");
 }
 
-if (buildConfig.appId !== "co.jamarq.scout.desktop") {
+if (buildConfig.appId !== "co.tenra.scout.desktop") {
   fail("Electron Builder appId is not the expected Scout bundle identifier.");
 }
 
-if (buildConfig.productName !== "Scout by JAMARQ") {
-  fail("Electron Builder productName is not Scout by JAMARQ.");
+if (buildConfig.productName !== "Tenra Scout") {
+  fail("Electron Builder productName is not Tenra Scout.");
 }
 
 if (buildConfig.asar !== true) {
