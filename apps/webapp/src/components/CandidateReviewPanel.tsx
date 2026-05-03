@@ -32,6 +32,7 @@ export function CandidateReviewPanel({
   const router = useRouter();
   const [businessName, setBusinessName] = useState("");
   const [url, setUrl] = useState("");
+  const [expectedReason, setExpectedReason] = useState("");
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const promotableCandidates = useMemo(
@@ -57,7 +58,8 @@ export function CandidateReviewPanel({
       body: JSON.stringify({
         action: "manual",
         businessName,
-        url
+        url,
+        expectedReason: expectedReason.trim() || undefined
       })
     });
 
@@ -69,6 +71,7 @@ export function CandidateReviewPanel({
 
     setBusinessName("");
     setUrl("");
+    setExpectedReason("");
     setPendingAction(null);
     router.refresh();
   }
@@ -105,7 +108,7 @@ export function CandidateReviewPanel({
   return (
     <div className="candidate-review">
       <form className="candidate-review-form" onSubmit={(event) => void submitManualCandidate(event)}>
-        <div className="section-label">Manual Candidate</div>
+        <div className="section-label">Expected Missing Business</div>
         <div className="candidate-review-fields">
           <input
             aria-label="Business name"
@@ -123,10 +126,22 @@ export function CandidateReviewPanel({
             placeholder="Website or profile URL"
             value={url}
           />
+          <input
+            aria-label="Why Scout should include this business"
+            className="draft-input"
+            maxLength={600}
+            onChange={(event) => setExpectedReason(event.target.value)}
+            placeholder="Why expected? e.g. known local shop, referral, map result"
+            value={expectedReason}
+          />
           <button className="link-button" disabled={!hasManualInput || Boolean(pendingAction)}>
             {pendingAction === "manual" ? "Adding..." : "Add and Evaluate"}
           </button>
         </div>
+        <p className="muted" style={{ margin: 0 }}>
+          Scout stores the expected signal with the report, then evaluates the business through the
+          same presence, audit, classification, and shortlist path as search-discovered candidates.
+        </p>
       </form>
 
       {promotableCandidates.length > 0 ? (

@@ -46,7 +46,9 @@
 - `verify:queue`
   Confirms queued run creation, worker claim behavior, lifecycle transitions, and failure-note persistence.
 - `verify:http-smoke`
-  Confirms the real HTTP submit and retrieval path: the web server returns a queued response promptly, a worker picks the run up, lifecycle state moves through `queued -> running -> completed`, and the final persisted report is retrievable from the real API.
+  Confirms the real HTTP submit and retrieval path: the web server returns a queued response promptly, a worker picks the run up, lifecycle state moves through `queued -> running -> completed`, the final persisted report is retrievable from the real API, and lead inbox/detail/export flows render over HTTP.
+- `verify:ui-smoke`
+  Alias for `verify:http-smoke`, used when validating the browser-facing flow names rather than the lower-level HTTP lifecycle name.
 - `build:web`
   Confirms the active Next.js app builds successfully.
 - `verify:desktop`
@@ -72,7 +74,7 @@ The repo has been exercised with:
 
 That coverage verifies schema bootstrap, repository persistence, legacy-import handling, screenshot storage, and report retrieval path.
 That coverage also verifies the Postgres-backed queue loop and repository-driven lifecycle updates.
-`verify:http-smoke` adds a real HTTP boundary check without introducing a larger end-to-end framework.
+`verify:http-smoke` adds a real HTTP boundary check without introducing a larger end-to-end framework. It now covers run submission, report retrieval, lead save, bulk lead update, lead inbox, lead detail, run pages, and lead export.
 `verify:providers` adds direct protection for the hardened DuckDuckGo, Google, and Bing adapters plus manual-confirmation diagnostics without introducing a heavier test harness.
 
 ## Expected Limitations
@@ -81,5 +83,5 @@ That coverage also verifies the Postgres-backed queue loop and repository-driven
 - Run execution depends on a separate local worker process being started.
 - The queue is intentionally simple and Postgres-backed, not a distributed job system.
 - The desktop app is a thin Electron wrapper over the local web app and worker, not a second independent runtime architecture.
-- The packaged desktop build still depends on `DATABASE_URL`; it is not a fully self-contained local-database app.
+- The packaged desktop build now seeds/defaults `DATABASE_URL=postgresql:///scout`, but it still expects a local Postgres service to be available. It is not yet an embedded single-file database runtime.
 - Screenshot evidence is still local-only.

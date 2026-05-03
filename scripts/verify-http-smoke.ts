@@ -7,6 +7,9 @@ import path from "node:path";
 import {
   createScoutRunResponseSchema,
   getScoutRunResponseSchema,
+  leadAnnotationResponseSchema,
+  leadInboxBulkActionResponseSchema,
+  listLeadInboxResponseSchema,
   type CreateScoutRunResponse,
   type GetScoutRunResponse
 } from "../packages/api-contracts/src/index.ts";
@@ -180,6 +183,94 @@ function parseCreateScoutRunResponse(value: unknown): CreateScoutRunResponse {
 
 function parseGetScoutRunResponse(value: unknown): GetScoutRunResponse {
   return getScoutRunResponseSchema.parse(value);
+}
+
+function chooseLeadCandidate(report: NonNullable<GetScoutRunResponse["report"]>): string {
+  return (
+    report.shortlist[0]?.candidateId ??
+    report.businessBreakdowns[0]?.candidateId ??
+    report.candidates[0]?.candidateId ??
+    ""
+  );
+}
+
+async function verifyLeadUiFlow(baseUrl: string, runId: string, report: NonNullable<GetScoutRunResponse["report"]>) {
+  const candidateId = chooseLeadCandidate(report);
+
+  if (!candidateId) {
+    throw new Error("HTTP smoke report did not include any candidate to use for the lead UI flow.");
+  }
+
+  const savedLead = await fetchJson(
+    `${baseUrl}/api/runs/${runId}/leads/${candidateId}`,
+    {
+      method: "PUT",
+      headers: {
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        state: "saved",
+        operatorNote: "HTTP smoke saved this lead from the UI flow.",
+        followUpDate: "2026-05-10"
+      })
+    },
+    (value) => leadAnnotationResponseSchema.parse(value)
+  );
+  assert.equal(savedLead.status, 200);
+  assert.equal(savedLead.body.annotation?.state, "saved");
+
+  const inbox = await fetchJson(
+    `${baseUrl}/api/leads?filter=saved`,
+    {
+      method: "GET"
+    },
+    (value) => listLeadInboxResponseSchema.parse(value)
+  );
+  assert.equal(inbox.status, 200);
+  assert(inbox.body.items.some((item) => item.runId === runId && item.candidateId === candidateId));
+
+  const bulk = await fetchJson(
+    `${baseUrl}/api/leads/bulk-actions`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        items: [
+          {
+            runId,
+            candidateId
+          }
+        ],
+        action: {
+          action: "mark_contacted"
+        }
+      })
+    },
+    (value) => leadInboxBulkActionResponseSchema.parse(value)
+  );
+  assert.equal(bulk.status, 200);
+  assert.equal(bulk.body.items[0]?.annotation.state, "contacted");
+
+  for (const pathName of [
+    "/",
+    "/runs",
+    "/leads",
+    `/runs/${runId}`,
+    `/leads/${runId}/${candidateId}`
+  ]) {
+    const response = await fetch(`${baseUrl}${pathName}`, {
+      signal: AbortSignal.timeout(10_000)
+    });
+    assert.equal(response.status, 200, `${pathName} should render over HTTP.`);
+  }
+
+  const exportResponse = await fetch(`${baseUrl}/api/leads/export?format=markdown`, {
+    signal: AbortSignal.timeout(10_000)
+  });
+  assert.equal(exportResponse.status, 200);
+  assert.match(await exportResponse.text(), /# Scout Lead Inbox/);
 }
 
 async function waitForServerReady(baseUrl: string, processRef: ManagedProcess): Promise<void> {
@@ -420,6 +511,8 @@ async function main(): Promise<void> {
     assert.ok(Array.isArray(report.businessBreakdowns));
     assert.ok(Array.isArray(report.shortlist));
     assert.ok(Array.isArray(report.notes));
+
+    await verifyLeadUiFlow(baseUrl, runId, report);
 
     console.log(
       `HTTP smoke verification passed for ${runId}. Observed statuses: ${[...observedStatuses].join(" -> ")}.`

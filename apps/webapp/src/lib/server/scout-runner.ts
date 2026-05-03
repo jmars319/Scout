@@ -7,7 +7,8 @@ import {
 import {
   createRunRepository,
   type PersistedRunRecord,
-  type RecentRunSummary
+  type RecentRunSummary,
+  type SavedMarketSummary
 } from "./storage/run-repository.ts";
 
 function slugify(value: string): string {
@@ -47,4 +48,8 @@ export async function getScoutRunRecord(runId: string): Promise<PersistedRunReco
 
 export async function listRecentScoutRuns(limit = 6): Promise<RecentRunSummary[]> {
   return createRunRepository().listRecent(limit);
+}
+
+export async function listSavedMarkets(limit = 12): Promise<SavedMarketSummary[]> {
+  return createRunRepository().listSavedMarkets(limit);
 }

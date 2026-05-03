@@ -26,6 +26,7 @@ export interface AddManualCandidateInput {
   runId: string;
   businessName: string;
   url: string;
+  expectedReason?: string | undefined;
 }
 
 export interface PromoteDiscardedCandidateInput {
@@ -287,11 +288,15 @@ export async function addManualCandidateToRun(
     rank: nextRank,
     provenance: "manual",
     snippet: "Operator supplied this business manually after the initial live acquisition.",
-    provenanceNote: "Operator-supplied candidate. Scout evaluated it with the same presence, audit, and shortlist rules."
+    provenanceNote: input.expectedReason?.trim()
+      ? `Operator-supplied missed business. Expected signal: ${input.expectedReason.trim()}`
+      : "Operator-supplied candidate. Scout evaluated it with the same presence, audit, and shortlist rules."
   });
 
   return addCandidatesToRun(input.runId, [candidate], [
-    `Operator manually added ${candidate.title} to the report.`
+    input.expectedReason?.trim()
+      ? `Operator manually added expected missing business ${candidate.title}. Expected signal: ${input.expectedReason.trim()}`
+      : `Operator manually added ${candidate.title} to the report.`
   ]);
 }
 

@@ -163,6 +163,21 @@ function resolveRecommendedChannel(editor: DraftEditorState): OutreachContactCha
   return editor.contactChannels[0] ?? null;
 }
 
+function buildMailtoHref(editor: DraftEditorState): string | null {
+  const email = editor.contactChannels.find((channel) => channel.kind === "email")?.value;
+
+  if (!email || !editor.subjectLine.trim() || !editor.body.trim()) {
+    return null;
+  }
+
+  const params = new URLSearchParams({
+    subject: editor.subjectLine,
+    body: editor.body
+  });
+
+  return `mailto:${email}?${params.toString()}`;
+}
+
 function resolveBusyMessage(busyState?: BusyState): string | null {
   if (busyState === "analyze") {
     return "Scout is inspecting the business presence for the best contact path.";
@@ -558,6 +573,10 @@ export function OutreachWorkspace({
           const message = messageByCandidate[lead.candidateId];
           const busyMessage = resolveBusyMessage(busyState);
           const recommendedChannel = resolveRecommendedChannel(editor);
+          const mailtoHref = buildMailtoHref(editor);
+          const contactFormUrl = editor.contactChannels.find(
+            (channel) => channel.kind === "contact_form"
+          )?.url;
           const isExpanded = expandedCandidateId === lead.candidateId;
           const cardSummary = describeLeadCardSummary(lead, editor);
           const hasEmailDraft =
@@ -693,6 +712,16 @@ export function OutreachWorkspace({
                     >
                       Copy Phone Notes
                     </button>
+                    {mailtoHref ? (
+                      <a className="secondary-button" href={mailtoHref}>
+                        Open Email
+                      </a>
+                    ) : null}
+                    {contactFormUrl ? (
+                      <a className="secondary-button" href={contactFormUrl} target="_blank" rel="noreferrer">
+                        Open Contact Form
+                      </a>
+                    ) : null}
                   </div>
 
                   {busyMessage ? <div className="status-note neutral">{busyMessage}</div> : null}

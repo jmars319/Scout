@@ -8,6 +8,7 @@ const { app, BrowserWindow, dialog, shell } = require("electron/main");
 
 import {
   createManagedProcess,
+  ensureDesktopDatabaseUrl,
   getAvailablePort,
   loadEnvFiles,
   stopManagedProcess,
@@ -93,15 +94,7 @@ async function startPackagedRuntime() {
     path.resolve(process.resourcesPath, "scout.env"),
     path.resolve(userDataDir, ".env")
   ]);
-
-  if (!process.env.DATABASE_URL) {
-    throw new Error(
-      `DATABASE_URL is required to launch packaged Scout desktop. Set it in ${path.resolve(
-        userDataDir,
-        ".env"
-      )} or launch the app from a shell with DATABASE_URL set.`
-    );
-  }
+  ensureDesktopDatabaseUrl(console);
 
   const port = await getAvailablePort();
   const baseUrl = `http://127.0.0.1:${port}`;

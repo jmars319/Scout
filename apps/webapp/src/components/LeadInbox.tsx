@@ -668,6 +668,12 @@ export function LeadInbox({
                       Report
                     </Link>
                     <Link
+                      className="secondary-button"
+                      href={`/leads/${encodeURIComponent(item.runId)}/${encodeURIComponent(item.candidateId)}`}
+                    >
+                      Details
+                    </Link>
+                    <Link
                       className="link-button"
                       href={`/runs/${encodeURIComponent(item.runId)}#outreach-workspace`}
                     >

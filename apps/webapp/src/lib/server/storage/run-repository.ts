@@ -3,7 +3,8 @@ import type { ScoutRunReport } from "@scout/domain";
 import { readLegacyRunRecord } from "./legacy-local-runs.ts";
 import {
   createPostgresRunRepository,
-  type RecentRunSummary
+  type RecentRunSummary,
+  type SavedMarketSummary
 } from "./postgres-run-repository.ts";
 import {
   type PersistedRunRecord,
@@ -12,7 +13,7 @@ import {
   toScoutRunReport
 } from "./persisted-run-record.ts";
 
-export type { PersistedRunRecord, RecentRunSummary };
+export type { PersistedRunRecord, RecentRunSummary, SavedMarketSummary };
 
 export interface RunRepository {
   createQueuedRun: (input: QueuedRunRecordInput) => Promise<PersistedRunRecord>;
@@ -33,6 +34,7 @@ export interface RunRepository {
   get: (runId: string) => Promise<ScoutRunReport | null>;
   getRecord: (runId: string) => Promise<PersistedRunRecord | null>;
   listRecent: (limit?: number) => Promise<RecentRunSummary[]>;
+  listSavedMarkets: (limit?: number) => Promise<SavedMarketSummary[]>;
 }
 
 export function createRunRepository(): RunRepository {
@@ -67,6 +69,7 @@ export function createRunRepository(): RunRepository {
     },
 
     getRecord,
-    listRecent: (limit) => postgresRepository.listRecent(limit)
+    listRecent: (limit) => postgresRepository.listRecent(limit),
+    listSavedMarkets: (limit) => postgresRepository.listSavedMarkets(limit)
   };
 }

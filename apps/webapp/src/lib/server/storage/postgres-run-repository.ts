@@ -22,6 +22,17 @@ export interface RecentRunSummary {
   sampleQuality?: MarketSampleQuality;
 }
 
+export interface SavedMarketSummary {
+  marketKey: string;
+  rawQuery: string;
+  marketTerm: string;
+  locationLabel?: string;
+  latestRunId: string;
+  latestRunAt: string;
+  runCount: number;
+  latestSampleQuality?: MarketSampleQuality;
+}
+
 interface ScoutRunRow {
   run_id: string;
   schema_version: number;
@@ -538,6 +549,60 @@ export function createPostgresRunRepository() {
         rawQuery: row.raw_query,
         marketTerm: row.market_term,
         ...(row.sample_quality ? { sampleQuality: row.sample_quality } : {})
+      }));
+    },
+
+    async listSavedMarkets(limit = 12): Promise<SavedMarketSummary[]> {
+      const rows = await sql<
+        Array<{
+          market_key: string;
+          raw_query: string;
+          market_term: string;
+          location_label: string | null;
+          latest_run_id: string;
+          latest_run_at: string | Date;
+          run_count: number;
+          latest_sample_quality: MarketSampleQuality | null;
+        }>
+      >`
+        with ranked_runs as (
+          select
+            lower(raw_query) as market_key,
+            raw_query,
+            market_term,
+            location_label,
+            run_id,
+            created_at,
+            sample_quality,
+            count(*) over (partition by lower(raw_query)) as run_count,
+            row_number() over (partition by lower(raw_query) order by created_at desc) as row_rank
+          from scout_runs
+          where status = 'completed'
+        )
+        select
+          market_key,
+          raw_query,
+          market_term,
+          location_label,
+          run_id as latest_run_id,
+          created_at as latest_run_at,
+          run_count,
+          sample_quality as latest_sample_quality
+        from ranked_runs
+        where row_rank = 1
+        order by created_at desc
+        limit ${Math.max(1, Math.min(limit, 50))}
+      `;
+
+      return rows.map((row) => ({
+        marketKey: row.market_key,
+        rawQuery: row.raw_query,
+        marketTerm: row.market_term,
+        ...(row.location_label ? { locationLabel: row.location_label } : {}),
+        latestRunId: row.latest_run_id,
+        latestRunAt: toIsoString(row.latest_run_at),
+        runCount: Number(row.run_count),
+        ...(row.latest_sample_quality ? { latestSampleQuality: row.latest_sample_quality } : {})
       }));
     }
   };

@@ -3,14 +3,18 @@ import { AppFrame, Metric, MetricGrid, Panel, Tag } from "@scout/ui";
 
 import { RecentRunsPanel } from "@/components/RecentRunsPanel";
 import { RunForm } from "@/components/RunForm";
+import { SavedMarketsPanel } from "@/components/SavedMarketsPanel";
 import { ScoutNavigation } from "@/components/ScoutNavigation";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { listRecentScoutRuns } from "@/lib/server/scout-runner";
+import { listRecentScoutRuns, listSavedMarkets } from "@/lib/server/scout-runner";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const recentRuns = await listRecentScoutRuns(6);
+  const [recentRuns, savedMarkets] = await Promise.all([
+    listRecentScoutRuns(6),
+    listSavedMarkets(6)
+  ]);
 
   return (
     <AppFrame
@@ -66,6 +70,13 @@ export default async function HomePage() {
         </div>
 
         <RecentRunsPanel runs={recentRuns} />
+
+        <Panel
+          title="Saved Markets"
+          description="Completed market scans are grouped here so you can re-scan the same market and compare fresh results against the previous report."
+        >
+          <SavedMarketsPanel markets={savedMarkets} />
+        </Panel>
       </div>
     </AppFrame>
   );

@@ -16,6 +16,7 @@ const desktopPackageDir = path.resolve(repoRoot, "apps/desktopapp");
 const electronMainScriptPath = path.resolve(desktopPackageDir, "scripts/main.mjs");
 const pnpmBin = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
 const PROCESS_EXIT_TIMEOUT_MS = 5_000;
+export const defaultDesktopDatabaseUrl = "postgresql:///scout";
 
 export function getRepoRoot() {
   return repoRoot;
@@ -39,6 +40,23 @@ export function loadWorkspaceEnv() {
       return path.resolve(repoRoot, fileName);
     })
   );
+}
+
+export function ensureDesktopDatabaseUrl(logger = console) {
+  if (process.env.DATABASE_URL?.trim()) {
+    return {
+      databaseUrl: process.env.DATABASE_URL,
+      defaulted: false
+    };
+  }
+
+  process.env.DATABASE_URL = defaultDesktopDatabaseUrl;
+  logger.log(`DATABASE_URL was not set. Scout desktop will use ${defaultDesktopDatabaseUrl}.`);
+
+  return {
+    databaseUrl: process.env.DATABASE_URL,
+    defaulted: true
+  };
 }
 
 export function createBaseEnv(baseUrl, localState) {
@@ -218,10 +236,7 @@ export async function launchElectron(baseUrl, extraEnv = {}) {
 
 export async function runDesktopShell({ webMode }) {
   loadWorkspaceEnv();
-
-  if (!process.env.DATABASE_URL) {
-    throw new Error("DATABASE_URL is required to run Scout desktop.");
-  }
+  ensureDesktopDatabaseUrl(console);
 
   const port = await getAvailablePort();
   const baseUrl = `http://127.0.0.1:${port}`;

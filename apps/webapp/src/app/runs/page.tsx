@@ -3,14 +3,18 @@ import Link from "next/link";
 import { AppFrame, Panel, Tag } from "@scout/ui";
 
 import { RecentRunsPanel } from "@/components/RecentRunsPanel";
+import { SavedMarketsPanel } from "@/components/SavedMarketsPanel";
 import { ScoutNavigation } from "@/components/ScoutNavigation";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { listRecentScoutRuns } from "@/lib/server/scout-runner";
+import { listRecentScoutRuns, listSavedMarkets } from "@/lib/server/scout-runner";
 
 export const dynamic = "force-dynamic";
 
 export default async function RunsIndexPage() {
-  const recentRuns = await listRecentScoutRuns(24);
+  const [recentRuns, savedMarkets] = await Promise.all([
+    listRecentScoutRuns(24),
+    listSavedMarkets(24)
+  ]);
   const queuedCount = recentRuns.filter((run) => run.status === "queued").length;
   const runningCount = recentRuns.filter((run) => run.status === "running").length;
   const completedCount = recentRuns.filter((run) => run.status === "completed").length;
@@ -50,6 +54,13 @@ export default async function RunsIndexPage() {
           title="All Recent Runs"
           description="Open any stored run from here, including queued and running runs. Progress pages stay reachable while the worker is still active."
         />
+
+        <Panel
+          title="Saved Markets"
+          description="Re-scan a previously completed market from the same raw query. New scans queue like any other Scout run."
+        >
+          <SavedMarketsPanel markets={savedMarkets} />
+        </Panel>
       </div>
     </AppFrame>
   );

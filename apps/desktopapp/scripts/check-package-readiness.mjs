@@ -7,6 +7,8 @@ const packageJsonPath = path.join(desktopDir, "package.json");
 const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf8"));
 const buildConfig = packageJson.build ?? {};
 const macConfig = buildConfig.mac ?? {};
+const runtimeScript = readFileSync(path.join(desktopDir, "scripts/lib/runtime.mjs"), "utf8");
+const launcherScript = readFileSync(path.join(desktopDir, "scripts/lib/launcher.mjs"), "utf8");
 
 function fail(message) {
   throw new Error(`Scout desktop package readiness failed: ${message}`);
@@ -53,6 +55,14 @@ const desktopRuntimeResource = Array.isArray(buildConfig.extraResources)
 
 if (!desktopRuntimeResource) {
   fail("Electron Builder extraResources must bundle .desktop-runtime as desktop-runtime.");
+}
+
+if (!runtimeScript.includes('defaultDesktopDatabaseUrl = "postgresql:///scout"')) {
+  fail("Desktop runtime must define Scout's default local database URL.");
+}
+
+if (!launcherScript.includes("DATABASE_URL=postgresql:///scout")) {
+  fail("Packaged env template must seed DATABASE_URL=postgresql:///scout.");
 }
 
 for (const relativePath of [

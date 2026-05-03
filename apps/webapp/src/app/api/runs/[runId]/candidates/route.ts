@@ -15,7 +15,8 @@ const addCandidateRequestSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("manual"),
     businessName: z.string().trim().min(2).max(140),
-    url: z.string().trim().min(4).max(400)
+    url: z.string().trim().min(4).max(400),
+    expectedReason: z.string().trim().max(600).optional()
   }),
   z.object({
     action: z.literal("promote_discarded"),
@@ -36,7 +37,8 @@ export async function POST(
         ? await addManualCandidateToRun({
             runId,
             businessName: input.businessName,
-            url: input.url
+            url: input.url,
+            expectedReason: input.expectedReason
           })
         : await promoteDiscardedCandidateToRun({
             runId,
