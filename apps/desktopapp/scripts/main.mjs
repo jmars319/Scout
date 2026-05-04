@@ -4,7 +4,7 @@ import path from "node:path";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const { app, BrowserWindow, dialog, shell } = require("electron/main");
+const { app, BrowserWindow, dialog, Menu, shell } = require("electron/main");
 
 import {
   createManagedProcess,
@@ -28,8 +28,65 @@ const packagedRuntimeVerifyMode = process.env.SCOUT_DESKTOP_RUNTIME_VERIFY === "
 let targetUrl = process.env.SCOUT_DESKTOP_URL;
 let runtimeRef = null;
 let shuttingDown = false;
+let mainWindow = null;
 
 app.setName(appName);
+
+function buildApplicationMenu() {
+  const template = [
+    {
+      label: appName,
+      submenu: [
+        { role: "about" },
+        { type: "separator" },
+        {
+          label: "Settings...",
+          accelerator: "CommandOrControl+,",
+          click: () => {
+            if (!targetUrl || !mainWindow || mainWindow.isDestroyed()) {
+              return;
+            }
+
+            const settingsUrl = new URL("/settings", targetUrl).toString();
+            mainWindow.show();
+            mainWindow.focus();
+            void mainWindow.loadURL(settingsUrl);
+          }
+        },
+        {
+          label: "Close Window",
+          accelerator: "CommandOrControl+W",
+          click: () => {
+            BrowserWindow.getFocusedWindow()?.close();
+          }
+        },
+        {
+          label: "Quit",
+          accelerator: "CommandOrControl+Q",
+          click: () => app.quit()
+        }
+      ]
+    },
+    {
+      label: "Edit",
+      submenu: [
+        { role: "undo" },
+        { role: "redo" },
+        { type: "separator" },
+        { role: "cut" },
+        { role: "copy" },
+        { role: "paste" },
+        { role: "selectAll" }
+      ]
+    },
+    {
+      label: "Window",
+      submenu: [{ role: "minimize" }, { role: "zoom" }]
+    }
+  ];
+
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
 
 function isInternalUrl(url) {
   if (!targetUrl) {
@@ -208,13 +265,19 @@ function createWindow() {
     height: 960,
     minWidth: 1180,
     minHeight: 760,
-    autoHideMenuBar: true,
     show: false,
     title: appName,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true
+    }
+  });
+  mainWindow = window;
+
+  window.once("closed", () => {
+    if (mainWindow === window) {
+      mainWindow = null;
     }
   });
 
@@ -242,6 +305,8 @@ function createWindow() {
 }
 
 app.whenReady().then(async () => {
+  buildApplicationMenu();
+
   if (verifyMode && !packagedRuntimeVerifyMode) {
     console.log("Scout desktop runtime verified.");
     app.quit();
@@ -285,6 +350,14 @@ app.on("before-quit", (event) => {
   });
 });
 
+app.on("activate", () => {
+  if (BrowserWindow.getAllWindows().length === 0 && targetUrl) {
+    createWindow();
+  }
+});
+
 app.on("window-all-closed", () => {
-  app.quit();
+  if (process.platform !== "darwin") {
+    app.quit();
+  }
 });
