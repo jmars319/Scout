@@ -167,7 +167,7 @@ export function OutreachProfileForm({
             className="draft-textarea"
             id="service-summary"
             onChange={(event) => updateField("serviceSummary", event.target.value)}
-            placeholder="A short plain-language explanation of what you help businesses with."
+            placeholder="Short service summary for outreach drafts."
             style={{ minHeight: "8rem" }}
             value={profile.serviceSummary}
           />
