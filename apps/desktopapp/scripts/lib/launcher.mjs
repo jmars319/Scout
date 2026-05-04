@@ -9,7 +9,7 @@ const desktopDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".
 const repoRoot = path.resolve(desktopDir, "../..");
 
 export const appName = process.env.SCOUT_DESKTOP_APP_NAME || "tenra Scout";
-const legacyAppNames = [];
+const legacyAppNames = ["Tenra Scout"];
 export const userApplicationsDirPath = path.resolve(os.homedir(), "Applications");
 export const systemApplicationsDirPath = "/Applications";
 export const distDesktopDirPath = path.resolve(repoRoot, "dist", "desktop");
@@ -201,14 +201,20 @@ export async function installPackagedApp({
     recursive: true,
     force: true
   });
-  for (const legacyName of legacyAppNames) {
-    await rm(getInstalledAppPath(installDirPath, legacyName), {
-      recursive: true,
-      force: true
-    });
+  for (const directoryPath of [userApplicationsDirPath, systemApplicationsDirPath]) {
+    for (const legacyName of legacyAppNames) {
+      await rm(getInstalledAppPath(directoryPath, legacyName), {
+        recursive: true,
+        force: true
+      });
+    }
   }
   await run("/usr/bin/ditto", [sourceAppPath, targetAppPath], {
     stdio: "inherit"
+  });
+  await rm(sourceAppPath, {
+    recursive: true,
+    force: true
   });
 
   const envResult = await ensurePackagedUserEnvFile({
