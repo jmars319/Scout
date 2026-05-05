@@ -202,6 +202,13 @@ export async function installPackagedApp({
     force: true
   });
   for (const directoryPath of [userApplicationsDirPath, systemApplicationsDirPath]) {
+    if (path.resolve(directoryPath) !== path.resolve(installDirPath)) {
+      await rm(getInstalledAppPath(directoryPath, name), {
+        recursive: true,
+        force: true
+      });
+    }
+
     for (const legacyName of legacyAppNames) {
       await rm(getInstalledAppPath(directoryPath, legacyName), {
         recursive: true,

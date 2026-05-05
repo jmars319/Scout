@@ -7,11 +7,11 @@ import {
   userApplicationsDirPath
 } from "./lib/launcher.mjs";
 
-const useSystemInstall = process.argv.includes("--system");
+const useUserInstall = process.argv.includes("--user");
 const revealOnly = process.argv.includes("--reveal");
 const noOpen = process.argv.includes("--no-open");
 
-const installDirPath = useSystemInstall ? systemApplicationsDirPath : userApplicationsDirPath;
+const installDirPath = useUserInstall ? userApplicationsDirPath : systemApplicationsDirPath;
 const result = await installPackagedApp({
   installDirPath
 });
@@ -30,4 +30,3 @@ if (revealOnly) {
 } else if (!noOpen) {
   await openMacApp(result.targetAppPath);
 }
-
