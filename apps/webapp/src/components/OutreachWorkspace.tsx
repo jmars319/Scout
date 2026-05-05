@@ -549,10 +549,10 @@ export function OutreachWorkspace({
           <strong>Desktop-first local outreach.</strong>{" "}
           Scout can inspect contact paths, recommend the best first channel, and save an email,
           short-form version, and phone talking points with this run on your machine.
-        </div>
+          </div>
         <div className="tag-row">
           <Tag tone={aiAvailable ? "good" : "warn"}>
-            {aiAvailable ? "AI Ready" : "AI Disabled"}
+            {aiAvailable ? "Draft Engine Ready" : "Draft Engine Disabled"}
           </Tag>
           <Tag>{model ?? "Manual editing only"}</Tag>
         </div>
@@ -560,8 +560,8 @@ export function OutreachWorkspace({
 
       {!aiAvailable ? (
         <p className="muted" style={{ margin: 0 }}>
-          Set <code>OPENAI_API_KEY</code> to generate the full outreach pack automatically. Contact
-          analysis and manual edits can still be saved locally.
+          Enable a local template, local Ollama, or OpenAI outreach provider to generate the full
+          outreach pack automatically. Contact analysis and manual edits can still be saved locally.
         </p>
       ) : null}
 

@@ -10,7 +10,7 @@ Scout is not a crawler, an SEO suite, or an AI-first app. The v1 product shape i
 - `apps/desktopapp` is now the primary product surface. It wraps the local web app and worker in a native desktop window.
 - `apps/mobileapp` is scaffold-only for future expansion.
 - Search uses a narrow provider seam with hardened DuckDuckGo HTML, Google Search, and Bing HTML adapters. Live runs no longer backfill seeded candidates.
-- Completed runs can now save local outreach packs for shortlisted businesses, including contact-path recommendations, email drafts, short-form versions, and phone talking points, with optional OpenAI assistance grounded on stored Scout evidence.
+- Completed runs can now save local outreach packs for shortlisted businesses, including contact-path recommendations, email drafts, short-form versions, and phone talking points. The default draft engine is a deterministic local template, with optional Ollama or OpenAI assistance grounded on stored Scout evidence.
 - Presence typing uses deterministic URL, domain, redirect, and basic destination-state rules before audit.
 - Acquisition now canonicalizes URLs, deduplicates across controlled query variants, extracts lower-confidence directory-snippet leads, and records market-confidence diagnostics.
 - Runs are stored in Postgres through an explicit repository layer.
@@ -135,6 +135,22 @@ scout/
 - Acquisition diagnostics record provider attempts, source contribution counts, degradation reasons, and caution notes so the operator can see what happened upstream before a run completed or failed.
 - In desktop mode, DuckDuckGo can open a real browser-backed challenge window so the operator can confirm the search was human and let Scout continue without synthetic fallback. Google does not use that path.
 - Scout still keeps the provider layer intentionally narrow. There is no large multi-vendor search framework here.
+
+## Local Outreach Drafting
+
+Scout's outreach workspace is locally usable without an AI API key. By default,
+`SCOUT_OUTREACH_PROVIDER=local_template` creates grounded email, short-message,
+and phone-note drafts from the stored Scout report and local sender profile.
+
+For local LLM drafting, run Ollama and set:
+
+```bash
+SCOUT_OUTREACH_PROVIDER=ollama
+SCOUT_OUTREACH_BASE_URL=http://127.0.0.1:11434
+SCOUT_OUTREACH_MODEL=llama3.2
+```
+
+For OpenAI drafting, set `SCOUT_OUTREACH_PROVIDER=openai` and `OPENAI_API_KEY`.
 
 ## HTTP Smoke Verification
 

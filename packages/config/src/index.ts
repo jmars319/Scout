@@ -53,9 +53,10 @@ export interface InteractiveSearchConfig {
 
 export interface OutreachConfig {
   enabled: boolean;
-  provider: "openai";
+  provider: "openai" | "ollama" | "local_template" | "disabled";
   model: string;
   apiKey?: string;
+  baseUrl?: string;
   defaultTone: OutreachTone;
   defaultLength: OutreachLength;
 }
@@ -149,15 +150,28 @@ export function getOutreachConfig(
   source: Record<string, string | undefined> = process.env
 ): OutreachConfig {
   const apiKey = source.OPENAI_API_KEY?.trim();
-  const model = source.SCOUT_OUTREACH_MODEL?.trim() || "gpt-5-mini";
+  const requestedProvider = source.SCOUT_OUTREACH_PROVIDER?.trim().toLowerCase();
+  const provider =
+    requestedProvider === "disabled"
+      ? "disabled"
+      : requestedProvider === "ollama"
+        ? "ollama"
+        : requestedProvider === "openai"
+          ? "openai"
+          : apiKey
+            ? "openai"
+            : "local_template";
+  const model = source.SCOUT_OUTREACH_MODEL?.trim() || (provider === "ollama" ? "llama3.2" : "gpt-5-mini");
+  const baseUrl = source.SCOUT_OUTREACH_BASE_URL?.trim() || "http://127.0.0.1:11434";
   const defaultTone = (source.SCOUT_OUTREACH_DEFAULT_TONE?.trim() || "calm") as OutreachTone;
   const defaultLength = (source.SCOUT_OUTREACH_DEFAULT_LENGTH?.trim() || "standard") as OutreachLength;
 
   return {
-    enabled: Boolean(apiKey),
-    provider: "openai",
+    enabled: provider !== "disabled" && (provider !== "openai" || Boolean(apiKey)),
+    provider,
     model,
     ...(apiKey ? { apiKey } : {}),
+    ...(provider === "ollama" ? { baseUrl } : {}),
     defaultTone:
       defaultTone === "calm" || defaultTone === "direct" || defaultTone === "friendly"
         ? defaultTone

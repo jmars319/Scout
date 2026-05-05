@@ -103,7 +103,7 @@ export function OutreachProfileForm({
 
       <Panel
         title="Outreach Profile"
-        description="Everything here stays local to Scout. The AI draft path uses it when available, and manual drafting can still benefit from having it filled out."
+        description="Everything here stays local to Scout. The draft engine uses it when available, and manual drafting can still benefit from having it filled out."
       >
         <div className="scout-grid two-up">
           <div className="field-stack">

@@ -222,6 +222,106 @@ function extractOpenAiErrorMessage(payload: unknown): string | null {
   return typeof error?.message === "string" ? error.message : null;
 }
 
+function firstUsefulLine(values: Array<string | undefined | null>, fallback: string): string {
+  return values.find((value) => value?.trim())?.trim() ?? fallback;
+}
+
+function buildLocalTemplateDraft(
+  target: ReturnType<typeof buildOutreachTargetContext>,
+  strategy: ContactStrategyState,
+  profile: Awaited<ReturnType<typeof getOutreachProfile>>,
+  tone: OutreachTone,
+  length: OutreachLength
+) {
+  const issue = firstUsefulLine(
+    [
+      target.findings[0]?.message,
+      target.grounding[0],
+      target.lead?.reasons[0],
+      target.business.topIssues[0]
+    ],
+    "there may be a few practical website improvements worth reviewing"
+  );
+  const serviceLine = profile.serviceLine || "website review";
+  const serviceSummary = profile.serviceSummary || "help businesses turn web presence issues into a short, practical fix list";
+  const senderName = profile.senderName || "";
+  const companyName = profile.companyName || "tenra";
+  const callToAction = profile.defaultCallToAction || "If it would be useful, I can send over the short version of what stood out.";
+  const signoff = profile.signature || [senderName, companyName].filter(Boolean).join("\n");
+  const opener =
+    tone === "direct"
+      ? `I was reviewing ${target.businessName}'s web presence and noticed one item worth a look.`
+      : tone === "friendly"
+        ? `I came across ${target.businessName} and noticed one practical item that may be worth a look.`
+        : `I reviewed ${target.businessName}'s web presence and noticed one practical item that may be worth checking.`;
+  const evidenceLine = `The clearest signal was: ${issue}`;
+  const offerLine = `My work is focused on ${serviceLine}; in practice, that means ${serviceSummary}.`;
+  const bodyLines =
+    length === "brief"
+      ? [opener, evidenceLine, callToAction]
+      : [opener, evidenceLine, offerLine, callToAction];
+
+  return generatedDraftSchema.parse({
+    subjectLine: `${target.businessName} website note`,
+    body: [...bodyLines, signoff ? `\n${signoff}` : ""].filter(Boolean).join("\n\n"),
+    shortMessage: `${opener} ${evidenceLine} ${callToAction}`.slice(0, 1100),
+    phoneTalkingPoints:
+      strategy.contactChannels.some((channel) => channel.kind === "phone")
+        ? {
+            opener: `Hi, I am calling with a quick website note for ${target.businessName}.`,
+            keyPoints: [
+              issue,
+              `This is based on a narrow review of ${target.primaryUrl}.`,
+              callToAction
+            ].slice(0, 3),
+            close: "What is the best email address to send the short note to?"
+          }
+        : null
+  });
+}
+
+async function requestOllamaDraft(
+  report: ScoutRunReport,
+  target: ReturnType<typeof buildOutreachTargetContext>,
+  strategy: ContactStrategyState,
+  profile: Awaited<ReturnType<typeof getOutreachProfile>>,
+  tone: OutreachTone,
+  length: OutreachLength
+) {
+  const config = getOutreachConfig();
+  const baseUrl = (config.baseUrl ?? "http://127.0.0.1:11434").replace(/\/+$/, "");
+  const response = await fetch(`${baseUrl}/api/generate`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      model: config.model,
+      stream: false,
+      format: "json",
+      prompt: [
+        buildSystemPrompt(tone, length, profile),
+        "Return only JSON with keys subjectLine, body, shortMessage, and phoneTalkingPoints.",
+        JSON.stringify(buildPromptPayload(report, target, strategy, profile, tone, length), null, 2)
+      ].join("\n\n")
+    }),
+    signal: AbortSignal.timeout(120_000)
+  });
+
+  const payload = (await response.json().catch(() => null)) as { response?: unknown; error?: unknown } | null;
+
+  if (!response.ok) {
+    const message = typeof payload?.error === "string" ? payload.error : `Local Ollama draft generation failed with HTTP ${response.status}.`;
+    throw new Error(message);
+  }
+
+  if (typeof payload?.response !== "string") {
+    throw new Error("Local Ollama draft generation returned no text.");
+  }
+
+  return generatedDraftSchema.parse(JSON.parse(payload.response));
+}
+
 async function requestGeneratedDraft(
   report: ScoutRunReport,
   candidateId: string,
@@ -230,13 +330,33 @@ async function requestGeneratedDraft(
   length: OutreachLength
 ) {
   const config = getOutreachConfig();
-
-  if (!config.enabled || !config.apiKey) {
-    throw new Error("OPENAI_API_KEY is required to generate Scout outreach drafts.");
-  }
-
   const target = buildOutreachTargetContext(report, candidateId);
   const profile = await getOutreachProfile();
+
+  if (!config.enabled) {
+    throw new Error("Scout outreach draft generation is disabled.");
+  }
+
+  if (config.provider === "local_template") {
+    return {
+      generated: buildLocalTemplateDraft(target, strategy, profile, tone, length),
+      target,
+      model: "local-template"
+    };
+  }
+
+  if (config.provider === "ollama") {
+    return {
+      generated: await requestOllamaDraft(report, target, strategy, profile, tone, length),
+      target,
+      model: config.model
+    };
+  }
+
+  if (!config.apiKey) {
+    throw new Error("OPENAI_API_KEY is required when SCOUT_OUTREACH_PROVIDER=openai.");
+  }
+
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
