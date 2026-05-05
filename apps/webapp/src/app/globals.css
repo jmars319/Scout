@@ -137,6 +137,13 @@ summary {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
+.handoff-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 1rem;
+}
+
 .report-overview-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: start;

@@ -15,6 +15,23 @@ export default async function HomePage() {
     listRecentScoutRuns(6),
     listSavedMarkets(6)
   ]);
+  const handoffTargets = [
+    {
+      label: "Registry",
+      tone: "good" as const,
+      text: "Lead identity, business details, audit evidence, and opportunity classification become intake context."
+    },
+    {
+      label: "Assembly",
+      tone: "good" as const,
+      text: "Approved evidence packs can become content briefs, case notes, or outreach review drafts."
+    },
+    {
+      label: "Proxy",
+      tone: "warn" as const,
+      text: "Outgoing language stays draft-only until Proxy rewrites and validates it against the selected voice profile."
+    }
+  ];
 
   return (
     <AppFrame
@@ -70,6 +87,22 @@ export default async function HomePage() {
         </div>
 
         <RecentRunsPanel runs={recentRuns} />
+
+        <Panel
+          title="Suite Handoff"
+          description="Scout should stay evidence-first. These handoffs make the next action explicit instead of hiding it behind automated outreach."
+        >
+          <div className="scout-grid three-up">
+            {handoffTargets.map((target) => (
+              <div key={target.label} className="handoff-card">
+                <Tag tone={target.tone}>{target.label}</Tag>
+                <p className="muted" style={{ margin: "0.8rem 0 0", lineHeight: 1.6 }}>
+                  {target.text}
+                </p>
+              </div>
+            ))}
+          </div>
+        </Panel>
 
         <Panel
           title="Saved Markets"
