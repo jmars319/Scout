@@ -1,4 +1,4 @@
-import { mkdir, rm } from "node:fs/promises";
+import { copyFile, mkdir, rm } from "node:fs/promises";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -8,6 +8,7 @@ const buildDir = path.resolve(desktopDir, "build");
 const iconsetDir = path.resolve(buildDir, "Scout.iconset");
 const sourcePngPath = path.resolve(buildDir, "icon-1024.png");
 const icnsPath = path.resolve(buildDir, "icon.icns");
+const designedSourcePath = path.resolve(desktopDir, "assets", "icon-source.png");
 const swiftScriptPath = path.resolve(desktopDir, "scripts", "build-icon.swift");
 
 const iconOutputs = [
@@ -56,8 +57,12 @@ await mkdir(iconsetDir, {
   recursive: true
 });
 
-console.log("Rendering Scout desktop icon...");
-await run("/usr/bin/swift", [swiftScriptPath, sourcePngPath]);
+console.log("Preparing Scout desktop icon...");
+try {
+  await copyFile(designedSourcePath, sourcePngPath);
+} catch {
+  await run("/usr/bin/swift", [swiftScriptPath, sourcePngPath]);
+}
 
 for (const [fileName, size] of iconOutputs) {
   await run("/usr/bin/sips", [
@@ -72,4 +77,3 @@ for (const [fileName, size] of iconOutputs) {
 
 await run("/usr/bin/iconutil", ["-c", "icns", iconsetDir, "-o", icnsPath]);
 console.log(`Scout desktop icon written to ${icnsPath}.`);
-
