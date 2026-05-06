@@ -67,7 +67,7 @@
 - `package:desktop`
   Confirms Scout can build a local macOS desktop package with a bundled production web runtime, bundled worker entrypoint, and bundled Chromium assets.
 - `qa:desktop-install`
-  Confirms the latest local package can be installed into `/Applications`, has a valid local signature, can start its packaged web runtime and worker, can reach/apply the local database schema, and can shut down cleanly without opening the operator window.
+  Confirms the latest local package can be installed into `~/Applications` for QA, has a valid local signature, can start its packaged web runtime and worker, can reach/apply the local database schema, and can shut down cleanly without opening the operator window.
 - `check:desktop-release-env`
   Confirms Developer ID signing and Apple notarization credentials are present before the release package build is attempted. This command is expected to fail on local-only machines.
 - `package:desktop:release`

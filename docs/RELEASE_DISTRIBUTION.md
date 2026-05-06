@@ -11,7 +11,7 @@ pnpm run package:desktop
 pnpm run qa:desktop-install
 ```
 
-This produces an ad-hoc signed local app, DMG, and zip under `dist/desktop`, installs the app into `/Applications`, verifies the signature, starts the packaged runtime, checks database/schema readiness, and shuts it down.
+This produces an ad-hoc signed local app, DMG, and zip under `dist/desktop`, installs the app into `~/Applications` for QA, verifies the signature, starts the packaged runtime, checks database/schema readiness, and shuts it down. The normal `install:desktop` command installs to `/Applications`.
 
 ## Public Release Package
 
