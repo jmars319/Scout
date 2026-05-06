@@ -197,6 +197,7 @@ export const scoutOpportunityHandoffSchema = z.object({
   proxyShapeRequest: z.object({
     clientApp: z.literal("scout"),
     surface: z.enum(["email", "operator-brief", "report"]),
+    profileId: z.string().regex(/^profile:/),
     purpose: z.string().trim().min(1),
     draftText: z.string().trim().min(1),
     hardConstraints: z.array(z.string().trim().min(1)),
@@ -248,7 +249,8 @@ export function buildScoutOpportunityHandoff(input: {
     recommendedNextApps: ["assembly", "proxy"],
     proxyShapeRequest: {
       clientApp: "scout",
-      surface: "operator-brief",
+      surface: "email",
+      profileId: "profile:default",
       purpose: "Shape Scout opportunity evidence for reviewed outreach or Assembly content intake.",
       draftText: evidenceMarkdown,
       hardConstraints: [

@@ -335,6 +335,22 @@ export function LeadDetailView({
           <Link className="link-button" href={`/runs/${encodeURIComponent(item.runId)}`}>
             Report
           </Link>
+          <a
+            className="secondary-button"
+            href={`/api/handoffs/opportunity/${encodeURIComponent(item.runId)}/${encodeURIComponent(item.candidateId)}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Export Handoff
+          </a>
+          <a
+            className="secondary-button"
+            href={`/api/handoffs/proxy-shape/${encodeURIComponent(item.runId)}/${encodeURIComponent(item.candidateId)}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Proxy Shape JSON
+          </a>
         </div>
       </div>
 

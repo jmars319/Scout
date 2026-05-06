@@ -994,6 +994,26 @@ export function ReportView({
                     </li>
                   ))}
                 </ul>
+                <div className="lead-detail-actions">
+                  <Link
+                    className="secondary-button"
+                    href={`/api/handoffs/opportunity/${encodeURIComponent(report.runId)}/${encodeURIComponent(
+                      lead.candidateId
+                    )}`}
+                    target="_blank"
+                  >
+                    Export Handoff
+                  </Link>
+                  <Link
+                    className="secondary-button"
+                    href={`/api/handoffs/proxy-shape/${encodeURIComponent(report.runId)}/${encodeURIComponent(
+                      lead.candidateId
+                    )}`}
+                    target="_blank"
+                  >
+                    Proxy Shape JSON
+                  </Link>
+                </div>
               </li>
             ))}
           </ul>

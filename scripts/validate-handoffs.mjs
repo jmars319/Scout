@@ -23,6 +23,12 @@ for (const file of files) {
   if (!expectedSchemas.has(payload.schema)) {
     throw new Error(`${file} uses an unexpected schema: ${payload.schema}`);
   }
+  if (payload.proxyShapeRequest?.profileId !== "profile:default") {
+    throw new Error(`${file} must include a default Proxy profile request.`);
+  }
+  if (!payload.recommendedNextApps?.includes("assembly") || !payload.recommendedNextApps?.includes("proxy")) {
+    throw new Error(`${file} must keep Assembly and Proxy as recommended next apps.`);
+  }
 }
 
 console.log(`Validated ${files.length} Scout handoff fixture(s).`);

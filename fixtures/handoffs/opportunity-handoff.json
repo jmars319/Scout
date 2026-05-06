@@ -13,7 +13,8 @@
   ],
   "proxyShapeRequest": {
     "clientApp": "scout",
-    "surface": "operator-brief",
+    "surface": "email",
+    "profileId": "profile:default",
     "purpose": "Shape Scout opportunity evidence for reviewed outreach.",
     "draftText": "Acme Dental has a missing appointment CTA and high-priority local SEO opportunity.",
     "hardConstraints": [
