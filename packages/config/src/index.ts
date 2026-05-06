@@ -1,6 +1,7 @@
 import type { OutreachLength, OutreachTone, ViewportKind } from "@scout/domain";
 
 export const APP_NAME = "tenra Scout";
+export const DEFAULT_DATABASE_URL = "postgresql:///scout";
 
 export interface ViewportPreset {
   kind: ViewportKind;
@@ -113,11 +114,7 @@ export function getDatabaseConfig(
 ): DatabaseConfig {
   const url = source.DATABASE_URL?.trim();
 
-  if (!url) {
-    throw new Error("DATABASE_URL is required for Scout run persistence.");
-  }
-
-  return { url };
+  return { url: url || DEFAULT_DATABASE_URL };
 }
 
 export function getWorkerConfig(

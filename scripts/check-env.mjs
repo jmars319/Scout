@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 
 const env = process.env;
+const defaultDatabaseUrl = "postgresql:///scout";
 
 if (typeof process.loadEnvFile === "function") {
   for (const fileName of [".env", ".env.local"]) {
@@ -99,9 +100,9 @@ if (evidenceDriver === "s3") {
 const appUrl = env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 new URL(appUrl);
 
-const databaseUrl = env.DATABASE_URL;
-if (!databaseUrl) {
-  throw new Error("DATABASE_URL is required. Scout now uses Postgres for run persistence.");
+const databaseUrl = env.DATABASE_URL || defaultDatabaseUrl;
+if (!env.DATABASE_URL) {
+  console.warn(`DATABASE_URL is not set. Scout will use ${defaultDatabaseUrl}.`);
 }
 
 new URL(databaseUrl);

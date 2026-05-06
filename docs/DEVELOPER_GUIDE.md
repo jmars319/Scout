@@ -12,8 +12,7 @@
 ## First Run
 
 1. Run `pnpm run bootstrap`.
-2. Set `DATABASE_URL` in `.env` or your shell.
-   Optional for outreach drafting: set `OPENAI_API_KEY`.
+2. Use the default local `DATABASE_URL=postgresql:///scout`, or set a different `DATABASE_URL` in `.env` or your shell. Optional for outreach drafting: set `OPENAI_API_KEY`.
 3. Run `pnpm run db:prepare`.
 4. If you have older local run files in `data/runs`, run `pnpm run db:import:local-runs`.
 5. Start the product with `pnpm run dev:web`.

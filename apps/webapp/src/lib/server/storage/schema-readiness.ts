@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
+import { DEFAULT_DATABASE_URL } from "@scout/config";
 import { getPostgresClient } from "./postgres-client.ts";
 
 export interface DatabaseReadiness {
@@ -52,7 +53,7 @@ function buildSetupHint(message: string): string {
     normalized.includes("database") &&
     (normalized.includes("does not exist") || normalized.includes("doesn't exist"))
   ) {
-    return "Create the local Scout database with `createdb scout`, then launch Scout again.";
+    return "Run `pnpm run db:prepare`, then launch Scout again.";
   }
 
   if (
@@ -67,7 +68,7 @@ function buildSetupHint(message: string): string {
     return "Update the desktop env file with a DATABASE_URL that matches your local Postgres credentials.";
   }
 
-  return "Confirm local Postgres is running, the `scout` database exists, and DATABASE_URL points at it.";
+  return "Confirm local Postgres is running, then run `pnpm run db:prepare`.";
 }
 
 export async function checkDatabaseReadiness({
@@ -75,19 +76,8 @@ export async function checkDatabaseReadiness({
 }: {
   ensureSchema?: boolean | undefined;
 } = {}): Promise<DatabaseReadiness> {
-  const databaseUrl = process.env.DATABASE_URL?.trim();
+  const databaseUrl = process.env.DATABASE_URL?.trim() || DEFAULT_DATABASE_URL;
   const schemaPath = resolveSchemaPath();
-
-  if (!databaseUrl) {
-    return {
-      ok: false,
-      schemaReady: false,
-      schemaPath,
-      ...(getDesktopEnvFile() ? { desktopEnvFile: getDesktopEnvFile() } : {}),
-      message: "DATABASE_URL is not set.",
-      setupHint: "Set DATABASE_URL in the Scout desktop env file, or use the default `postgresql:///scout` after creating the local database."
-    };
-  }
 
   try {
     const sql = getPostgresClient();
