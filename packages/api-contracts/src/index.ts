@@ -182,6 +182,26 @@ export const outreachProfileResponseSchema = z.object({
   errorMessage: z.string().optional()
 });
 
+export const scoutOpportunityHandoffSchema = z.object({
+  schema: z.literal("tenra-scout.opportunity-handoff.v1"),
+  exportedAt: z.iso.datetime(),
+  sourceApp: z.literal("scout"),
+  runId: z.string().min(1),
+  candidateId: z.string().min(1),
+  businessName: z.string().trim().min(1),
+  primaryUrl: z.string().url(),
+  evidenceMarkdown: z.string().trim().min(1),
+  recommendedNextApps: z.array(z.enum(["assembly", "proxy"])).min(1),
+  proxyShapeRequest: z.object({
+    clientApp: z.literal("scout"),
+    surface: z.enum(["email", "operator-brief", "report"]),
+    purpose: z.string().trim().min(1),
+    draftText: z.string().trim().min(1),
+    hardConstraints: z.array(z.string().trim().min(1)),
+    traceId: z.string().trim().min(1)
+  })
+});
+
 export type CreateScoutRunRequest = z.infer<typeof createScoutRunRequestSchema>;
 export type CreateScoutRunResponse = z.infer<typeof createScoutRunResponseSchema>;
 export type GetScoutRunResponse = z.infer<typeof getScoutRunResponseSchema>;
@@ -201,3 +221,4 @@ export type ListOutreachDraftsResponse = z.infer<typeof listOutreachDraftsRespon
 export type OutreachDraftResponse = z.infer<typeof outreachDraftResponseSchema>;
 export type UpdateOutreachProfileRequest = z.infer<typeof updateOutreachProfileRequestSchema>;
 export type OutreachProfileResponse = z.infer<typeof outreachProfileResponseSchema>;
+export type ScoutOpportunityHandoff = z.infer<typeof scoutOpportunityHandoffSchema>;
