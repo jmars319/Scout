@@ -32,6 +32,7 @@ import {
 } from "./sample-quality-copy";
 
 type LeadAction = "analyze_contact" | "generate_draft" | "mark_contacted";
+type HandoffTarget = "assembly" | "proxy";
 
 interface LeadMessage {
   text: string;
@@ -278,6 +279,50 @@ export function LeadDetailView({
     }
   }
 
+  async function deliverHandoff(target: HandoffTarget) {
+    if (pendingKey) {
+      return;
+    }
+
+    setPendingKey(`deliver-${target}`);
+    const response = await fetch(
+      `/api/handoffs/deliver/${encodeURIComponent(item.runId)}/${encodeURIComponent(item.candidateId)}`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({ target })
+      }
+    );
+
+    const body = (await response.json()) as {
+      ok?: boolean;
+      delivered?: boolean;
+      deliveryMode?: string;
+      fallback?: unknown;
+      errorMessage?: string;
+    };
+
+    if (!response.ok || !body.ok) {
+      setMessage({ text: body.errorMessage ?? "Handoff delivery failed.", tone: "danger" });
+      setPendingKey(null);
+      return;
+    }
+
+    if (!body.delivered && body.fallback) {
+      await navigator.clipboard?.writeText(JSON.stringify(body.fallback, null, 2));
+    }
+
+    setMessage({
+      text: body.delivered
+        ? `Sent to ${target}`
+        : `${target} endpoint not configured; JSON fallback copied`,
+      tone: body.delivered ? "good" : "neutral"
+    });
+    setPendingKey(null);
+  }
+
   return (
     <div className="scout-shell">
       <div className="lead-detail-hero report-card">
@@ -351,6 +396,22 @@ export function LeadDetailView({
           >
             Proxy Shape JSON
           </a>
+          <button
+            className="secondary-button"
+            disabled={Boolean(pendingKey)}
+            onClick={() => void deliverHandoff("assembly")}
+            type="button"
+          >
+            {pendingKey === "deliver-assembly" ? "Sending..." : "Send Assembly"}
+          </button>
+          <button
+            className="secondary-button"
+            disabled={Boolean(pendingKey)}
+            onClick={() => void deliverHandoff("proxy")}
+            type="button"
+          >
+            {pendingKey === "deliver-proxy" ? "Sending..." : "Send Proxy"}
+          </button>
         </div>
       </div>
 

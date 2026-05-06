@@ -327,7 +327,19 @@ export const persistenceMetadataSchema = z.object({
   evidenceStorage: z.literal("local"),
   importedFromLegacyLocal: z.boolean(),
   importSourcePath: z.string().optional(),
-  importedAt: z.iso.datetime().optional()
+  importedAt: z.iso.datetime().optional(),
+  handoffHistory: z.array(
+    z.object({
+      exportedAt: z.iso.datetime(),
+      candidateId: z.string().min(1),
+      target: z.enum(["assembly", "proxy"]),
+      mode: z.enum(["download", "direct-post", "json-fallback"]),
+      endpoint: z.string().optional(),
+      traceId: z.string().min(1),
+      status: z.enum(["ok", "failed"]),
+      message: z.string().optional()
+    })
+  ).default([])
 });
 
 export const runExecutionSchema = z.object({

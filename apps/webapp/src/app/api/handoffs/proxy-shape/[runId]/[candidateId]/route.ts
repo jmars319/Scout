@@ -1,6 +1,9 @@
 import { buildScoutOpportunityHandoff } from "@scout/api-contracts";
 import { NextResponse } from "next/server";
-import { getScoutRun } from "../../../../../../lib/server/scout-runner.ts";
+import {
+  getScoutRun,
+  recordScoutHandoffDelivery
+} from "../../../../../../lib/server/scout-runner.ts";
 
 interface Params {
   params: Promise<{
@@ -18,7 +21,17 @@ export async function GET(_request: Request, { params }: Params) {
       return NextResponse.json({ errorMessage: "Scout run not found." }, { status: 404 });
     }
 
-    return NextResponse.json(buildScoutOpportunityHandoff({ report, candidateId }).proxyShapeRequest);
+    const handoff = buildScoutOpportunityHandoff({ report, candidateId });
+    await recordScoutHandoffDelivery({
+      runId,
+      candidateId,
+      target: "proxy",
+      mode: "download",
+      traceId: handoff.proxyShapeRequest.traceId,
+      status: "ok"
+    });
+
+    return NextResponse.json(handoff.proxyShapeRequest);
   } catch (error) {
     return NextResponse.json(
       { errorMessage: error instanceof Error ? error.message : "Scout Proxy shape export failed." },

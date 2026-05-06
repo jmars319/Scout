@@ -38,6 +38,7 @@ export interface PersistenceMetadataInput {
   importedFromLegacyLocal?: boolean;
   importSourcePath?: string;
   importedAt?: string;
+  handoffHistory?: PersistedRunRecord["persistence"]["handoffHistory"];
 }
 
 export interface RunExecutionInput {
@@ -71,7 +72,8 @@ function createPersistenceMetadata(
   const metadata: PersistedRunRecord["persistence"] = {
     runStorage: "postgres",
     evidenceStorage: "local",
-    importedFromLegacyLocal: input.importedFromLegacyLocal ?? false
+    importedFromLegacyLocal: input.importedFromLegacyLocal ?? false,
+    handoffHistory: input.handoffHistory ?? []
   };
 
   if (input.importSourcePath) {
@@ -478,6 +480,7 @@ function upgradeLegacyReportPayload(
     },
     persistence: {
       importedFromLegacyLocal: true,
+      handoffHistory: [],
       ...(sourcePath ? { importSourcePath: sourcePath } : {}),
       importedAt: new Date().toISOString()
     }

@@ -334,6 +334,7 @@ async function saveMutatedReport(record: PersistedRunRecord, report: ScoutRunRep
     },
     persistence: {
       importedFromLegacyLocal: record.persistence.importedFromLegacyLocal,
+      handoffHistory: record.persistence.handoffHistory,
       ...(record.persistence.importSourcePath
         ? { importSourcePath: record.persistence.importSourcePath }
         : {}),

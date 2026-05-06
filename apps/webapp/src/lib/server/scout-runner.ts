@@ -11,6 +11,17 @@ import {
   type SavedMarketSummary
 } from "./storage/run-repository.ts";
 
+export interface ScoutHandoffHistoryInput {
+  runId: string;
+  candidateId: string;
+  target: "assembly" | "proxy";
+  mode: "download" | "direct-post" | "json-fallback";
+  endpoint?: string | undefined;
+  traceId: string;
+  status: "ok" | "failed";
+  message?: string | undefined;
+}
+
 function slugify(value: string): string {
   return value
     .toLowerCase()
@@ -44,6 +55,36 @@ export async function getScoutRun(runId: string): Promise<ScoutRunReport | null>
 
 export async function getScoutRunRecord(runId: string): Promise<PersistedRunRecord | null> {
   return createRunRepository().getRecord(runId);
+}
+
+export async function recordScoutHandoffDelivery(input: ScoutHandoffHistoryInput): Promise<PersistedRunRecord | null> {
+  const repository = createRunRepository();
+  const record = await repository.getRecord(input.runId);
+  if (!record) {
+    return null;
+  }
+
+  const exportedAt = new Date().toISOString();
+  return repository.upsertRecord({
+    ...record,
+    updatedAt: exportedAt,
+    persistence: {
+      ...record.persistence,
+      handoffHistory: [
+        {
+          exportedAt,
+          candidateId: input.candidateId,
+          target: input.target,
+          mode: input.mode,
+          ...(input.endpoint ? { endpoint: input.endpoint } : {}),
+          traceId: input.traceId,
+          status: input.status,
+          ...(input.message ? { message: input.message } : {})
+        },
+        ...record.persistence.handoffHistory
+      ].slice(0, 100)
+    }
+  });
 }
 
 export async function listRecentScoutRuns(limit = 6): Promise<RecentRunSummary[]> {
