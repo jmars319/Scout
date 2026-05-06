@@ -9,7 +9,7 @@ import {
 
 const useUserInstall = process.argv.includes("--user");
 const revealOnly = process.argv.includes("--reveal");
-const noOpen = process.argv.includes("--no-open");
+const shouldOpen = process.argv.includes("--open");
 
 const installDirPath = useUserInstall ? userApplicationsDirPath : systemApplicationsDirPath;
 const result = await installPackagedApp({
@@ -27,6 +27,6 @@ if (result.createdEnvFile) {
 
 if (revealOnly) {
   await revealMacApp(result.targetAppPath);
-} else if (!noOpen) {
+} else if (shouldOpen) {
   await openMacApp(result.targetAppPath);
 }

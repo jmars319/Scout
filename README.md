@@ -111,7 +111,7 @@ scout/
 - `pnpm run package:desktop:release`
   Requires Developer ID signing plus Apple notarization credentials, then builds the same macOS artifacts for release distribution. Supported notarization credential sets are `APPLE_API_KEY`/`APPLE_API_KEY_ID`/`APPLE_API_ISSUER`, `APPLE_ID`/`APPLE_APP_SPECIFIC_PASSWORD`/`APPLE_TEAM_ID`, or `APPLE_KEYCHAIN_PROFILE`.
 - `pnpm run install:desktop`
-  Builds the packaged macOS app, installs it into `/Applications/tenra Scout.app`, seeds `~/Library/Application Support/tenra Scout/.env` if needed, and opens Scout like a normal Mac app. Pass `-- --user` to the desktop app install script only when a user-local `~/Applications` install is intentionally needed.
+  Builds the packaged macOS app, installs it into `/Applications/tenra Scout.app`, and seeds `~/Library/Application Support/tenra Scout/.env` if needed. It does not open Scout automatically. Pass `-- --open` to the desktop app install script only when launch-after-install is intentionally needed.
 - `pnpm run launch:desktop`
   Opens the installed Scout app from `/Applications` when present, otherwise falls back to the packaged build under `dist/desktop`.
 - Desktop startup automatically prunes cache-heavy folders inside the interactive-search Chromium profile at most once per 24 hours. That keeps `.local` from growing indefinitely without throwing away the session state that helps DuckDuckGo and Google confirmation windows stay useful.
@@ -126,7 +126,7 @@ scout/
 - Desktop mode enables manual in-browser confirmation only for DuckDuckGo. If DuckDuckGo serves a human-check page, Scout can open a local browser-backed search window and continue after the operator clears it. Google is treated as fetch-only and simply degrades if it serves a challenge flow.
 - The packaged app still needs `DATABASE_URL`, but Scout now auto-creates `~/Library/Application Support/tenra Scout/.env` on first packaged launch with `DATABASE_URL=postgresql:///scout` as the local default.
 - Public macOS distribution should use `pnpm run package:desktop:release`, which fails before packaging if Developer ID signing or notarization credentials are missing.
-- If you prefer a one-step local install instead of opening bundles from `dist/desktop`, use `pnpm run install:desktop` once and then launch Scout from Spotlight, Launchpad, Finder, or the Dock like a normal Mac app.
+- If you prefer a one-step local install instead of opening bundles from `dist/desktop`, use `pnpm run install:desktop` once and then launch Scout with `pnpm run launch:desktop`, Spotlight, Launchpad, Finder, or the Dock.
 
 ## Live Acquisition
 

@@ -26,7 +26,7 @@
 `pnpm run package:desktop:release` requires Developer ID signing and Apple notarization credentials, then builds release-ready macOS artifacts.
 `pnpm run check:desktop-release-env` checks release signing and notarization prerequisites without running the expensive package build.
 `pnpm run qa:operator` prints the manual operator QA checklist and current local artifact/install status.
-`pnpm run install:desktop` packages Scout, installs `tenra Scout.app` into `/Applications`, seeds the packaged desktop `.env` file if needed, and opens the installed app.
+`pnpm run install:desktop` packages Scout, installs `tenra Scout.app` into `/Applications`, and seeds the packaged desktop `.env` file if needed. It does not open Scout automatically.
 `pnpm run launch:desktop` opens the installed Scout app from `/Applications` or falls back to the packaged build under `dist/desktop`.
 `pnpm run clean:local` prunes the desktop interactive-search browser caches without clearing the saved session.
 `pnpm run clean:local:full` removes the local interactive-search profile and local screenshot evidence without touching Postgres.
@@ -205,7 +205,7 @@ Desktop startup also prunes cache-heavy folders inside that profile at most once
   `APPLE_ID`/`APPLE_APP_SPECIFIC_PASSWORD`/`APPLE_TEAM_ID`,
   or `APPLE_KEYCHAIN_PROFILE`. After packaging, Scout verifies the built `.app` with `codesign` and `spctl`.
 - `pnpm run install:desktop`
-  Packages Scout, copies `tenra Scout.app` into `/Applications`, seeds the packaged desktop env file, and opens the installed app.
+  Packages Scout, copies `tenra Scout.app` into `/Applications`, and seeds the packaged desktop env file without opening the app.
 - `pnpm run launch:desktop`
   Opens the installed app from `/Applications` without rebuilding it.
 - `pnpm run dev:mobile`
