@@ -8,6 +8,8 @@ import {
 } from "@scout/validation";
 import { z } from "zod";
 
+type ScoutRunReport = z.infer<typeof scoutRunReportSchema>;
+
 const leadStatuses = ["needs_review", "saved", "contacted", "dismissed", "not_a_fit"] as const;
 const outreachTones = ["calm", "direct", "friendly"] as const;
 const outreachLengths = ["brief", "standard"] as const;
@@ -201,6 +203,62 @@ export const scoutOpportunityHandoffSchema = z.object({
     traceId: z.string().trim().min(1)
   })
 });
+
+export function buildScoutOpportunityHandoff(input: {
+  report: ScoutRunReport;
+  candidateId: string;
+  exportedAt?: string | undefined;
+}): ScoutOpportunityHandoff {
+  const lead = input.report.shortlist.find((item) => item.candidateId === input.candidateId);
+  const business = input.report.businessBreakdowns.find((item) => item.candidateId === input.candidateId);
+  const candidate = input.report.candidates.find((item) => item.candidateId === input.candidateId);
+  const findings = input.report.findings.filter((item) => item.candidateId === input.candidateId);
+  const businessName = lead?.businessName ?? business?.businessName ?? candidate?.title ?? input.candidateId;
+  const primaryUrl = lead?.primaryUrl ?? business?.primaryUrl ?? candidate?.url;
+
+  if (!primaryUrl) {
+    throw new Error("Scout opportunity handoff requires a primary URL.");
+  }
+
+  const evidenceMarkdown = [
+    `# ${businessName}`,
+    "",
+    `Run: ${input.report.runId}`,
+    `Query: ${input.report.query.rawQuery}`,
+    `URL: ${primaryUrl}`,
+    "",
+    "## Reasons",
+    ...(lead?.reasons.length ? lead.reasons : business?.detectionNotes ?? []).map((reason) => `- ${reason}`),
+    "",
+    "## Findings",
+    ...(findings.length
+      ? findings.map((finding) => `- ${finding.severity}: ${finding.message}`)
+      : ["- No audit findings were recorded for this candidate."])
+  ].join("\n");
+
+  return scoutOpportunityHandoffSchema.parse({
+    schema: "tenra-scout.opportunity-handoff.v1",
+    exportedAt: input.exportedAt ?? new Date().toISOString(),
+    sourceApp: "scout",
+    runId: input.report.runId,
+    candidateId: input.candidateId,
+    businessName,
+    primaryUrl,
+    evidenceMarkdown,
+    recommendedNextApps: ["assembly", "proxy"],
+    proxyShapeRequest: {
+      clientApp: "scout",
+      surface: "operator-brief",
+      purpose: "Shape Scout opportunity evidence for reviewed outreach or Assembly content intake.",
+      draftText: evidenceMarkdown,
+      hardConstraints: [
+        "Do not invent contact details",
+        "Preserve audit findings and uncertainty"
+      ],
+      traceId: `scout-${input.report.runId}-${input.candidateId}`
+    }
+  });
+}
 
 export type CreateScoutRunRequest = z.infer<typeof createScoutRunRequestSchema>;
 export type CreateScoutRunResponse = z.infer<typeof createScoutRunResponseSchema>;

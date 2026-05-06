@@ -1,0 +1,25 @@
+{
+  "schema": "tenra-scout.opportunity-handoff.v1",
+  "exportedAt": "2026-05-06T17:30:00.000Z",
+  "sourceApp": "scout",
+  "runId": "run_demo_market",
+  "candidateId": "candidate_acme",
+  "businessName": "Acme Dental",
+  "primaryUrl": "https://example.com/acme-dental",
+  "evidenceMarkdown": "# Acme Dental\n\n- Missing appointment CTA\n- High-priority local SEO opportunity",
+  "recommendedNextApps": [
+    "assembly",
+    "proxy"
+  ],
+  "proxyShapeRequest": {
+    "clientApp": "scout",
+    "surface": "operator-brief",
+    "purpose": "Shape Scout opportunity evidence for reviewed outreach.",
+    "draftText": "Acme Dental has a missing appointment CTA and high-priority local SEO opportunity.",
+    "hardConstraints": [
+      "Do not invent contact details",
+      "Preserve audit findings and uncertainty"
+    ],
+    "traceId": "scout-fixture-opportunity"
+  }
+}
