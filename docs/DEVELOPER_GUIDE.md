@@ -22,12 +22,12 @@
 `pnpm run dev:all` starts the web app and worker together in one local shell session.
 `pnpm run dev:desktop` starts a local web server plus worker automatically, then opens the same Scout flow inside Electron.
 `pnpm run package:desktop` builds a local macOS desktop package under `dist/desktop` with ad-hoc signing when no Apple signing credentials are available.
-`pnpm run qa:desktop-install` installs the latest packaged app into `~/Applications`, verifies the app signature, starts the packaged runtime, checks database/schema readiness, and shuts it down.
+`pnpm run qa:desktop-install` installs the latest packaged app into `/Applications`, verifies the app signature, starts the packaged runtime, checks database/schema readiness, and shuts it down.
 `pnpm run package:desktop:release` requires Developer ID signing and Apple notarization credentials, then builds release-ready macOS artifacts.
 `pnpm run check:desktop-release-env` checks release signing and notarization prerequisites without running the expensive package build.
 `pnpm run qa:operator` prints the manual operator QA checklist and current local artifact/install status.
-`pnpm run install:desktop` packages Scout, installs `tenra Scout.app` into `~/Applications`, seeds the packaged desktop `.env` file if needed, and opens the installed app.
-`pnpm run launch:desktop` opens the installed Scout app from `~/Applications` or falls back to the packaged build under `dist/desktop`.
+`pnpm run install:desktop` packages Scout, installs `tenra Scout.app` into `/Applications`, seeds the packaged desktop `.env` file if needed, and opens the installed app.
+`pnpm run launch:desktop` opens the installed Scout app from `/Applications` or falls back to the packaged build under `dist/desktop`.
 `pnpm run clean:local` prunes the desktop interactive-search browser caches without clearing the saved session.
 `pnpm run clean:local:full` removes the local interactive-search profile and local screenshot evidence without touching Postgres.
 
@@ -192,7 +192,7 @@ Desktop startup also prunes cache-heavy folders inside that profile at most once
 - `pnpm run verify:desktop`
   Typechecks the desktop package and verifies the Electron runtime entrypoint can boot and exit cleanly.
 - `pnpm run qa:desktop-install`
-  Installs the current local package into `~/Applications`, verifies the app signature, launches the packaged runtime in QA mode, checks local database/schema readiness through the bundled web app, then shuts down without opening the operator window.
+  Installs the current local package into `/Applications`, verifies the app signature, launches the packaged runtime in QA mode, checks local database/schema readiness through the bundled web app, then shuts down without opening the operator window.
 - `pnpm run package:desktop`
   Builds a local macOS package that bundles:
   the production Next.js build
@@ -205,13 +205,13 @@ Desktop startup also prunes cache-heavy folders inside that profile at most once
   `APPLE_ID`/`APPLE_APP_SPECIFIC_PASSWORD`/`APPLE_TEAM_ID`,
   or `APPLE_KEYCHAIN_PROFILE`. After packaging, Scout verifies the built `.app` with `codesign` and `spctl`.
 - `pnpm run install:desktop`
-  Packages Scout, copies `tenra Scout.app` into `~/Applications`, seeds the packaged desktop env file, and opens the installed app.
+  Packages Scout, copies `tenra Scout.app` into `/Applications`, seeds the packaged desktop env file, and opens the installed app.
 - `pnpm run launch:desktop`
-  Opens the installed app from `~/Applications` without rebuilding it.
+  Opens the installed app from `/Applications` without rebuilding it.
 - `pnpm run dev:mobile`
   Mobile remains scaffold-only in v1 and currently prints a stable message.
 
-Desktop stays intentionally thin. It does not introduce a second product workflow or a separate persistence model; it wraps the same `input -> run -> report` path already implemented in the web app and worker.
+Desktop stays product-primary while sharing the same runtime path as the local web app and worker. It should feel like a full operator program without introducing a second persistence model or a forked `input -> run -> report` workflow.
 
 ## Packaged Desktop Env
 

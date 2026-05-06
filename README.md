@@ -111,9 +111,9 @@ scout/
 - `pnpm run package:desktop:release`
   Requires Developer ID signing plus Apple notarization credentials, then builds the same macOS artifacts for release distribution. Supported notarization credential sets are `APPLE_API_KEY`/`APPLE_API_KEY_ID`/`APPLE_API_ISSUER`, `APPLE_ID`/`APPLE_APP_SPECIFIC_PASSWORD`/`APPLE_TEAM_ID`, or `APPLE_KEYCHAIN_PROFILE`.
 - `pnpm run install:desktop`
-  Builds the packaged macOS app, installs it into `~/Applications/tenra Scout.app`, seeds `~/Library/Application Support/tenra Scout/.env` if needed, and opens Scout like a normal Mac app.
+  Builds the packaged macOS app, installs it into `/Applications/tenra Scout.app`, seeds `~/Library/Application Support/tenra Scout/.env` if needed, and opens Scout like a normal Mac app. Pass `-- --user` to the desktop app install script only when a user-local `~/Applications` install is intentionally needed.
 - `pnpm run launch:desktop`
-  Opens the installed Scout app from `~/Applications` when present, otherwise falls back to the packaged build under `dist/desktop`.
+  Opens the installed Scout app from `/Applications` when present, otherwise falls back to the packaged build under `dist/desktop`.
 - Desktop startup automatically prunes cache-heavy folders inside the interactive-search Chromium profile at most once per 24 hours. That keeps `.local` from growing indefinitely without throwing away the session state that helps DuckDuckGo and Google confirmation windows stay useful.
 - `pnpm run clean:local`
   Prunes only the interactive-search browser caches under repo `.local`.
@@ -165,7 +165,7 @@ For OpenAI drafting, set `SCOUT_OUTREACH_PROVIDER=openai` and `OPENAI_API_KEY`.
 - No deep crawl.
 - No authentication flow.
 - No Redis, BullMQ, or separate cloud worker system.
-- The desktop app is a thin local shell over the existing web app and worker, not a separate native feature set.
+- The desktop app is the primary operator program. It currently packages the local web runtime and worker rather than duplicating the product stack, but desktop UX and packaging decisions lead the product.
 - Local desktop packages are ad-hoc signed by default. Notarized release packages require Apple Developer credentials through `pnpm run package:desktop:release`.
 - Screenshot evidence is still local-only.
 - The background worker currently uses a simple Postgres-backed queue loop.

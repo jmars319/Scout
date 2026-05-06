@@ -67,7 +67,7 @@
 - `package:desktop`
   Confirms Scout can build a local macOS desktop package with a bundled production web runtime, bundled worker entrypoint, and bundled Chromium assets.
 - `qa:desktop-install`
-  Confirms the latest local package can be installed into `~/Applications`, has a valid local signature, can start its packaged web runtime and worker, can reach/apply the local database schema, and can shut down cleanly without opening the operator window.
+  Confirms the latest local package can be installed into `/Applications`, has a valid local signature, can start its packaged web runtime and worker, can reach/apply the local database schema, and can shut down cleanly without opening the operator window.
 - `check:desktop-release-env`
   Confirms Developer ID signing and Apple notarization credentials are present before the release package build is attempted. This command is expected to fail on local-only machines.
 - `package:desktop:release`
@@ -97,6 +97,6 @@ That coverage also verifies the Postgres-backed queue loop and repository-driven
 - Live search stability still depends on upstream HTML providers.
 - Run execution depends on a separate local worker process being started.
 - The queue is intentionally simple and Postgres-backed, not a distributed job system.
-- The desktop app is a thin Electron wrapper over the local web app and worker, not a second independent runtime architecture.
+- The desktop app is the primary operator program. It packages the local web app and worker instead of maintaining a second independent runtime architecture.
 - The packaged desktop build now seeds/defaults `DATABASE_URL=postgresql:///scout` and applies the bundled schema on startup, but it still expects a local Postgres service and database to be available. It is not yet an embedded single-file database runtime.
 - Screenshot evidence is still local-only.
