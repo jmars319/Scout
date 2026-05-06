@@ -1,0 +1,26 @@
+{
+  "schema": "tenra-scout.opportunity-handoff.v1",
+  "exportedAt": "2026-05-06T18:30:00.000Z",
+  "sourceApp": "scout",
+  "runId": "run_direct_delivery_smoke",
+  "candidateId": "candidate_direct_delivery",
+  "businessName": "Direct Delivery Dental",
+  "primaryUrl": "https://example.com/direct-delivery",
+  "evidenceMarkdown": "# Direct Delivery Dental\n\n- Smoke fixture for Scout to Assembly and Proxy handoff delivery.",
+  "recommendedNextApps": [
+    "assembly",
+    "proxy"
+  ],
+  "proxyShapeRequest": {
+    "clientApp": "scout",
+    "surface": "email",
+    "profileId": "profile:default",
+    "purpose": "Smoke-test direct Scout handoff delivery to Proxy.",
+    "draftText": "Direct Delivery Dental has enough public evidence for reviewed outreach.",
+    "hardConstraints": [
+      "Do not invent contact details",
+      "Preserve audit findings and uncertainty"
+    ],
+    "traceId": "suite-direct-delivery-smoke"
+  }
+}

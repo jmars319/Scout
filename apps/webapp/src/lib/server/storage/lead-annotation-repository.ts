@@ -4,7 +4,8 @@ import type {
   LeadOpportunity,
   LeadStatus,
   MarketSampleQuality,
-  SearchCandidate
+  SearchCandidate,
+  ScoutHandoffHistoryEntry
 } from "@scout/domain";
 import { leadAnnotationSchema } from "@scout/validation";
 
@@ -32,6 +33,9 @@ interface LeadAnnotationRunRow extends LeadAnnotationRow {
     businessBreakdowns: BusinessBreakdown[];
   } | null;
   shortlist: LeadOpportunity[];
+  persistence_metadata: {
+    handoffHistory?: ScoutHandoffHistoryEntry[];
+  } | null;
 }
 
 export interface SaveLeadAnnotationInput {
@@ -66,6 +70,7 @@ export interface LeadAnnotationRunRecord {
     selectedCandidates: SearchCandidate[];
     businessBreakdowns: BusinessBreakdown[];
     shortlist: LeadOpportunity[];
+    handoffHistory: ScoutHandoffHistoryEntry[];
   };
 }
 
@@ -118,7 +123,8 @@ function mapRowToRunRecord(row: LeadAnnotationRunRow): LeadAnnotationRunRecord {
       ...(row.sample_quality ? { sampleQuality: row.sample_quality } : {}),
       selectedCandidates: row.selected_candidates,
       businessBreakdowns: row.business_results?.businessBreakdowns ?? [],
-      shortlist: row.shortlist
+      shortlist: row.shortlist,
+      handoffHistory: row.persistence_metadata?.handoffHistory ?? []
     }
   };
 }
@@ -163,7 +169,8 @@ export function createLeadAnnotationRepository(): LeadAnnotationRepository {
           runs.sample_quality,
           runs.selected_candidates,
           runs.business_results,
-          runs.shortlist
+          runs.shortlist,
+          runs.persistence_metadata
         from scout_lead_annotations annotations
         join scout_runs runs on runs.run_id = annotations.run_id
         order by annotations.updated_at desc
@@ -191,7 +198,8 @@ export function createLeadAnnotationRepository(): LeadAnnotationRepository {
           runs.sample_quality,
           runs.selected_candidates,
           runs.business_results,
-          runs.shortlist
+          runs.shortlist,
+          runs.persistence_metadata
         from scout_lead_annotations annotations
         join scout_runs runs on runs.run_id = annotations.run_id
         where annotations.run_id = ${runId} and annotations.candidate_id = ${candidateId}

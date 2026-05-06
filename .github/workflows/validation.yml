@@ -18,6 +18,8 @@ jobs:
         run: corepack enable
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Check suite handoff contract conformance
+        run: node scripts/generate-handoff-registry.mjs --check
       - name: Validate handoff fixtures
         run: pnpm run verify:handoffs
       - name: Run typecheck

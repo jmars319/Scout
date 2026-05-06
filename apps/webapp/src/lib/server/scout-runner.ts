@@ -14,8 +14,8 @@ import {
 export interface ScoutHandoffHistoryInput {
   runId: string;
   candidateId: string;
-  target: "assembly" | "proxy";
-  mode: "download" | "direct-post" | "json-fallback";
+  target: "assembly" | "proxy" | "guardrail";
+  mode: "download" | "direct-post" | "json-fallback" | "decision-return";
   endpoint?: string | undefined;
   traceId: string;
   status: "ok" | "failed";

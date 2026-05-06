@@ -301,6 +301,7 @@ export function LeadDetailView({
       delivered?: boolean;
       deliveryMode?: string;
       fallback?: unknown;
+      handoffHistory?: LeadInboxItem["handoffHistory"];
       errorMessage?: string;
     };
 
@@ -312,6 +313,10 @@ export function LeadDetailView({
 
     if (!body.delivered && body.fallback) {
       await navigator.clipboard?.writeText(JSON.stringify(body.fallback, null, 2));
+    }
+
+    if (body.handoffHistory) {
+      setItem((current) => ({ ...current, handoffHistory: body.handoffHistory ?? [] }));
     }
 
     setMessage({
@@ -412,8 +417,39 @@ export function LeadDetailView({
           >
             {pendingKey === "deliver-proxy" ? "Sending..." : "Send Proxy"}
           </button>
+          </div>
         </div>
-      </div>
+
+        {item.handoffHistory.length ? (
+          <div className="report-card lead-detail-section">
+            <div className="section-label">Handoff History</div>
+            <ol className="lead-timeline">
+              {item.handoffHistory.slice(0, 6).map((entry) => (
+                <li key={`${entry.traceId}-${entry.exportedAt}`}>
+                  <strong>
+                    {entry.target} / {entry.mode}
+                  </strong>
+                  <span>{formatLeadUpdatedAt(entry.exportedAt)}</span>
+                  <div className="muted">
+                    {entry.status}
+                    {entry.endpoint ? ` · ${entry.endpoint}` : ""}
+                    {entry.message ? ` · ${entry.message.slice(0, 120)}` : ""}
+                  </div>
+                  {entry.status === "failed" && (entry.target === "assembly" || entry.target === "proxy") ? (
+                    <button
+                      className="secondary-button"
+                      disabled={Boolean(pendingKey)}
+                      onClick={() => void deliverHandoff(entry.target === "proxy" ? "proxy" : "assembly")}
+                      type="button"
+                    >
+                      Retry {entry.target}
+                    </button>
+                  ) : null}
+                </li>
+              ))}
+            </ol>
+          </div>
+        ) : null}
 
       <div className="scout-grid report-overview-grid">
         <section className="report-card lead-detail-section">

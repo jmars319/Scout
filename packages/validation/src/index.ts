@@ -211,6 +211,18 @@ export const leadInboxItemSchema = z.object({
   highSeverityFindings: z.number().int().nonnegative(),
   topIssues: z.array(z.enum(auditIssueTypes)),
   reasons: z.array(z.string()),
+  handoffHistory: z.array(
+    z.object({
+      exportedAt: z.iso.datetime(),
+      candidateId: z.string().min(1),
+      target: z.enum(["assembly", "proxy", "guardrail"]),
+      mode: z.enum(["download", "direct-post", "json-fallback", "decision-return"]),
+      endpoint: z.string().optional(),
+      traceId: z.string().min(1),
+      status: z.enum(["ok", "failed"]),
+      message: z.string().optional()
+    })
+  ).default([]),
   outreach: leadOutreachSummarySchema,
   annotation: leadAnnotationSchema
 });
@@ -332,8 +344,8 @@ export const persistenceMetadataSchema = z.object({
     z.object({
       exportedAt: z.iso.datetime(),
       candidateId: z.string().min(1),
-      target: z.enum(["assembly", "proxy"]),
-      mode: z.enum(["download", "direct-post", "json-fallback"]),
+      target: z.enum(["assembly", "proxy", "guardrail"]),
+      mode: z.enum(["download", "direct-post", "json-fallback", "decision-return"]),
       endpoint: z.string().optional(),
       traceId: z.string().min(1),
       status: z.enum(["ok", "failed"]),

@@ -306,6 +306,17 @@ export interface LeadOutreachSummary {
   draftUpdatedAt?: string | undefined;
 }
 
+export interface ScoutHandoffHistoryEntry {
+  exportedAt: string;
+  candidateId: string;
+  target: "assembly" | "proxy" | "guardrail";
+  mode: "download" | "direct-post" | "json-fallback" | "decision-return";
+  endpoint?: string | undefined;
+  traceId: string;
+  status: "ok" | "failed";
+  message?: string | undefined;
+}
+
 export interface LeadInboxItem {
   runId: string;
   runCreatedAt: string;
@@ -327,6 +338,7 @@ export interface LeadInboxItem {
   highSeverityFindings: number;
   topIssues: AuditIssueType[];
   reasons: string[];
+  handoffHistory: ScoutHandoffHistoryEntry[];
   outreach: LeadOutreachSummary;
   annotation: LeadAnnotation;
 }

@@ -35,7 +35,7 @@ export async function POST(request: Request, { params }: Params) {
     const payload = target === "proxy" ? handoff.proxyShapeRequest : handoff;
 
     if (!endpoint) {
-      await recordScoutHandoffDelivery({
+      const record = await recordScoutHandoffDelivery({
         runId,
         candidateId,
         target,
@@ -48,7 +48,8 @@ export async function POST(request: Request, { params }: Params) {
         ok: true,
         delivered: false,
         deliveryMode: "json-fallback",
-        fallback: payload
+        fallback: payload,
+        handoffHistory: record?.persistence.handoffHistory ?? []
       });
     }
 
@@ -60,7 +61,7 @@ export async function POST(request: Request, { params }: Params) {
 
     if (!response.ok) {
       const message = await response.text();
-      await recordScoutHandoffDelivery({
+      const record = await recordScoutHandoffDelivery({
         runId,
         candidateId,
         target,
@@ -75,11 +76,12 @@ export async function POST(request: Request, { params }: Params) {
         delivered: false,
         deliveryMode: "json-fallback",
         errorMessage: message,
-        fallback: payload
+        fallback: payload,
+        handoffHistory: record?.persistence.handoffHistory ?? []
       });
     }
 
-    await recordScoutHandoffDelivery({
+    const record = await recordScoutHandoffDelivery({
       runId,
       candidateId,
       target,
@@ -92,7 +94,8 @@ export async function POST(request: Request, { params }: Params) {
       ok: true,
       delivered: true,
       deliveryMode: "direct-post",
-      response: await response.json().catch(() => ({}))
+      response: await response.json().catch(() => ({})),
+      handoffHistory: record?.persistence.handoffHistory ?? []
     });
   } catch (error) {
     return NextResponse.json(

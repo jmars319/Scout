@@ -258,6 +258,9 @@ function buildLeadInboxItems(
       highSeverityFindings: business?.highSeverityFindings ?? 0,
       topIssues: business?.topIssues ?? [],
       reasons: shortlist?.reasons ?? [],
+      handoffHistory: record.run.handoffHistory.filter(
+        (entry) => entry.candidateId === record.annotation.candidateId
+      ),
       outreach: buildOutreachSummary(record.annotation.state, draft),
       annotation: record.annotation
     };
