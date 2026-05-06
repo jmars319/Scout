@@ -32,7 +32,8 @@ import {
 } from "./sample-quality-copy";
 
 type LeadAction = "analyze_contact" | "generate_draft" | "mark_contacted";
-type HandoffTarget = "assembly" | "proxy";
+type HandoffTarget = "assembly" | "proxy" | "guardrail";
+type ScoutEndpointConfig = Record<HandoffTarget, string>;
 
 interface LeadMessage {
   text: string;
@@ -43,6 +44,30 @@ interface LeadTimelineEntry {
   label: string;
   value: string;
   detail: string;
+}
+
+const endpointStorageKey = "tenra-scout-suite-endpoints:v1";
+const defaultEndpointConfig: ScoutEndpointConfig = {
+  assembly: "",
+  proxy: "",
+  guardrail: ""
+};
+
+function readEndpointConfig(): ScoutEndpointConfig {
+  if (typeof window === "undefined") {
+    return defaultEndpointConfig;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(endpointStorageKey);
+    return { ...defaultEndpointConfig, ...(raw ? JSON.parse(raw) : {}) };
+  } catch {
+    return defaultEndpointConfig;
+  }
+}
+
+function writeEndpointConfig(config: ScoutEndpointConfig) {
+  window.localStorage.setItem(endpointStorageKey, JSON.stringify(config));
 }
 
 function isClosed(state: LeadStatus): boolean {
@@ -142,6 +167,7 @@ export function LeadDetailView({
   const [draft, setDraft] = useState<OutreachDraft | undefined>(initialDraft);
   const [message, setMessage] = useState<LeadMessage | null>(null);
   const [pendingKey, setPendingKey] = useState<string | null>(null);
+  const [endpointConfig, setEndpointConfig] = useState<ScoutEndpointConfig>(readEndpointConfig);
   const recommendedChannel = resolveRecommendedChannel(draft);
   const mailtoHref = buildMailtoHref(draft);
   const contactFormUrl = draft?.contactChannels.find((channel) => channel.kind === "contact_form")?.url;
@@ -292,7 +318,7 @@ export function LeadDetailView({
         headers: {
           "content-type": "application/json"
         },
-        body: JSON.stringify({ target })
+        body: JSON.stringify({ target, endpoint: endpointConfig[target].trim() || undefined })
       }
     );
 
@@ -326,6 +352,14 @@ export function LeadDetailView({
       tone: body.delivered ? "good" : "neutral"
     });
     setPendingKey(null);
+  }
+
+  function updateEndpoint(target: HandoffTarget, value: string) {
+    setEndpointConfig((current) => {
+      const next = { ...current, [target]: value };
+      writeEndpointConfig(next);
+      return next;
+    });
   }
 
   return (
@@ -417,6 +451,31 @@ export function LeadDetailView({
           >
             {pendingKey === "deliver-proxy" ? "Sending..." : "Send Proxy"}
           </button>
+          <button
+            className="secondary-button"
+            disabled={Boolean(pendingKey)}
+            onClick={() => void deliverHandoff("guardrail")}
+            type="button"
+          >
+            {pendingKey === "deliver-guardrail" ? "Sending..." : "Send Guardrail"}
+          </button>
+          </div>
+        </div>
+
+        <div className="report-card lead-detail-section">
+          <div className="section-label">Suite Endpoints</div>
+          <div className="lead-inbox-controls">
+            {(["assembly", "proxy", "guardrail"] as const).map((target) => (
+              <label className="field-stack" key={target}>
+                <span className="section-label">{target}</span>
+                <input
+                  className="draft-input"
+                  onChange={(event) => updateEndpoint(target, event.currentTarget.value)}
+                  placeholder={`Optional ${target} endpoint`}
+                  value={endpointConfig[target]}
+                />
+              </label>
+            ))}
           </div>
         </div>
 

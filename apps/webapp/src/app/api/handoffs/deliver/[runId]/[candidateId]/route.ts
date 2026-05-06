@@ -12,18 +12,20 @@ interface Params {
   }>;
 }
 
-function defaultEndpoint(target: "assembly" | "proxy"): string | undefined {
-  return target === "assembly" ? process.env.SCOUT_ASSEMBLY_HANDOFF_URL : process.env.SCOUT_PROXY_SHAPE_URL;
+function defaultEndpoint(target: "assembly" | "proxy" | "guardrail"): string | undefined {
+  if (target === "assembly") return process.env.SCOUT_ASSEMBLY_HANDOFF_URL;
+  if (target === "guardrail") return process.env.SCOUT_GUARDRAIL_REVIEW_URL;
+  return process.env.SCOUT_PROXY_SHAPE_URL;
 }
 
 export async function POST(request: Request, { params }: Params) {
   const { runId, candidateId } = await params;
   try {
     const body = (await request.json()) as {
-      target?: "assembly" | "proxy";
+      target?: "assembly" | "proxy" | "guardrail";
       endpoint?: string;
     };
-    const target = body.target === "proxy" ? "proxy" : "assembly";
+    const target = body.target === "proxy" ? "proxy" : body.target === "guardrail" ? "guardrail" : "assembly";
     const endpoint = body.endpoint || defaultEndpoint(target);
     const report = await getScoutRun(runId);
 
@@ -32,7 +34,29 @@ export async function POST(request: Request, { params }: Params) {
     }
 
     const handoff = buildScoutOpportunityHandoff({ report, candidateId });
-    const payload = target === "proxy" ? handoff.proxyShapeRequest : handoff;
+    const traceId =
+      target === "guardrail" ? `${handoff.proxyShapeRequest.traceId}-guardrail` : handoff.proxyShapeRequest.traceId;
+    const payload =
+      target === "proxy"
+        ? handoff.proxyShapeRequest
+        : target === "guardrail"
+          ? {
+              schema: "tenra-guardrail.external-action-review.v1",
+              exportedAt: handoff.exportedAt,
+              sourceApp: "scout",
+              actionKind: "send-message",
+              actorLabel: "Scout lead inbox",
+              targetLabel: handoff.businessName,
+              summary: "Scout opportunity evidence is ready for reviewed outreach or Assembly intake.",
+              evidence: [
+                { label: "Business", value: handoff.businessName },
+                { label: "Primary URL", value: handoff.primaryUrl },
+                { label: "Scout run", value: handoff.runId }
+              ],
+              recommendedDecision: "review",
+              traceId
+            }
+          : handoff;
 
     if (!endpoint) {
       const record = await recordScoutHandoffDelivery({
@@ -40,7 +64,7 @@ export async function POST(request: Request, { params }: Params) {
         candidateId,
         target,
         mode: "json-fallback",
-        traceId: handoff.proxyShapeRequest.traceId,
+        traceId,
         status: "ok",
         message: "No endpoint configured; returned JSON fallback."
       });
@@ -67,7 +91,7 @@ export async function POST(request: Request, { params }: Params) {
         target,
         mode: "json-fallback",
         endpoint,
-        traceId: handoff.proxyShapeRequest.traceId,
+        traceId,
         status: "failed",
         message
       });
@@ -87,7 +111,7 @@ export async function POST(request: Request, { params }: Params) {
       target,
       mode: "direct-post",
       endpoint,
-      traceId: handoff.proxyShapeRequest.traceId,
+      traceId,
       status: "ok"
     });
     return NextResponse.json({

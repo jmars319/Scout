@@ -832,6 +832,19 @@ export function LeadInbox({
                   </ul>
                 ) : null}
 
+                {item.handoffHistory.length ? (
+                  <div className="tag-row">
+                    {item.handoffHistory.slice(0, 3).map((entry) => (
+                      <Tag
+                        key={`${itemKey}-${entry.target}-${entry.traceId}-${entry.exportedAt}`}
+                        tone={entry.status === "failed" ? "danger" : "good"}
+                      >
+                        {entry.target}: {entry.status}
+                      </Tag>
+                    ))}
+                  </div>
+                ) : null}
+
                 <div className="lead-inbox-controls">
                   <label className="field-stack">
                     <span className="section-label">State</span>
