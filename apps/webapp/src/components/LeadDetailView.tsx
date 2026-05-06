@@ -34,6 +34,13 @@ import {
 type LeadAction = "analyze_contact" | "generate_draft" | "mark_contacted";
 type HandoffTarget = "assembly" | "proxy" | "guardrail";
 type ScoutEndpointConfig = Record<HandoffTarget, string>;
+type HandoffHealthResult = {
+  target: HandoffTarget;
+  ok: boolean;
+  endpoint?: string;
+  status: string | number;
+  message: string;
+};
 
 interface LeadMessage {
   text: string;
@@ -168,6 +175,7 @@ export function LeadDetailView({
   const [message, setMessage] = useState<LeadMessage | null>(null);
   const [pendingKey, setPendingKey] = useState<string | null>(null);
   const [endpointConfig, setEndpointConfig] = useState<ScoutEndpointConfig>(readEndpointConfig);
+  const [endpointHealth, setEndpointHealth] = useState<HandoffHealthResult[]>([]);
   const recommendedChannel = resolveRecommendedChannel(draft);
   const mailtoHref = buildMailtoHref(draft);
   const contactFormUrl = draft?.contactChannels.find((channel) => channel.kind === "contact_form")?.url;
@@ -354,6 +362,42 @@ export function LeadDetailView({
     setPendingKey(null);
   }
 
+  async function checkEndpointHealth() {
+    if (pendingKey) {
+      return;
+    }
+
+    setPendingKey("endpoint-health");
+    try {
+      const response = await fetch("/api/handoffs/health", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json"
+        },
+        body: JSON.stringify(endpointConfig)
+      });
+      const body = (await response.json()) as {
+        ok?: boolean;
+        results?: HandoffHealthResult[];
+        errorMessage?: string;
+      };
+      if (!response.ok || !body.results) {
+        throw new Error(body.errorMessage ?? "Endpoint health check failed.");
+      }
+      setEndpointHealth(body.results);
+      setMessage({
+        text: body.results.filter((result) => result.ok).length
+          ? "Endpoint health checked"
+          : "No reachable endpoints found",
+        tone: body.results.some((result) => !result.ok && result.status !== "not-configured") ? "danger" : "neutral"
+      });
+    } catch (error) {
+      setMessage({ text: error instanceof Error ? error.message : "Endpoint health check failed.", tone: "danger" });
+    } finally {
+      setPendingKey(null);
+    }
+  }
+
   function updateEndpoint(target: HandoffTarget, value: string) {
     setEndpointConfig((current) => {
       const next = { ...current, [target]: value };
@@ -477,6 +521,25 @@ export function LeadDetailView({
               </label>
             ))}
           </div>
+          <div className="lead-detail-actions">
+            <button
+              className="secondary-button"
+              disabled={Boolean(pendingKey)}
+              onClick={() => void checkEndpointHealth()}
+              type="button"
+            >
+              {pendingKey === "endpoint-health" ? "Checking..." : "Check Health"}
+            </button>
+          </div>
+          {endpointHealth.length ? (
+            <div className="tag-row">
+              {endpointHealth.map((result) => (
+                <Tag key={result.target} tone={result.ok ? "good" : result.status === "not-configured" ? "warn" : "danger"}>
+                  {result.target}: {result.ok ? "ok" : String(result.status)}
+                </Tag>
+              ))}
+            </div>
+          ) : null}
         </div>
 
         {item.handoffHistory.length ? (
@@ -494,16 +557,16 @@ export function LeadDetailView({
                     {entry.endpoint ? ` · ${entry.endpoint}` : ""}
                     {entry.message ? ` · ${entry.message.slice(0, 120)}` : ""}
                   </div>
-                  {entry.status === "failed" && (entry.target === "assembly" || entry.target === "proxy") ? (
+                  <div className="lead-detail-actions">
                     <button
                       className="secondary-button"
                       disabled={Boolean(pendingKey)}
-                      onClick={() => void deliverHandoff(entry.target === "proxy" ? "proxy" : "assembly")}
+                      onClick={() => void deliverHandoff(entry.target)}
                       type="button"
                     >
-                      Retry {entry.target}
+                      {entry.status === "failed" ? "Retry" : "Resend"} {entry.target}
                     </button>
-                  ) : null}
+                  </div>
                 </li>
               ))}
             </ol>
