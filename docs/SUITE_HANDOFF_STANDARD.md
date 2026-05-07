@@ -8,6 +8,10 @@ lead discovery and opportunity source
 
 keep unique; other apps should consume Scout opportunities, while Scout can use Proxy and Guardrail as reusable services.
 
+## Standalone Mode
+
+Runs as a complete lead discovery and opportunity review app with local lead inbox, candidate details, outreach context, and run controls.
+
 ## Accepted Inputs
 
 - No accepted suite contract is registered yet.
