@@ -59,6 +59,11 @@ const defaultEndpointConfig: ScoutEndpointConfig = {
   proxy: "",
   guardrail: ""
 };
+const suiteEndpointPresets: ScoutEndpointConfig = {
+  assembly: "http://localhost:3001/api/handoffs/scout-opportunity",
+  proxy: "http://localhost:5173/api/shape-external-output",
+  guardrail: "http://localhost:5174/api/external-reviews"
+};
 
 function readEndpointConfig(): ScoutEndpointConfig {
   if (typeof window === "undefined") {
@@ -406,6 +411,12 @@ export function LeadDetailView({
     });
   }
 
+  function applyEndpointPresets() {
+    setEndpointConfig(suiteEndpointPresets);
+    writeEndpointConfig(suiteEndpointPresets);
+    setMessage({ text: "Suite handoff destination presets applied.", tone: "good" });
+  }
+
   return (
     <div className="scout-shell">
       <div className="lead-detail-hero report-card">
@@ -507,7 +518,7 @@ export function LeadDetailView({
         </div>
 
         <div className="report-card lead-detail-section">
-          <div className="section-label">Suite Endpoints</div>
+          <div className="section-label">Handoff Destinations</div>
           <div className="lead-inbox-controls">
             {(["assembly", "proxy", "guardrail"] as const).map((target) => (
               <label className="field-stack" key={target}>
@@ -522,6 +533,14 @@ export function LeadDetailView({
             ))}
           </div>
           <div className="lead-detail-actions">
+            <button
+              className="secondary-button"
+              disabled={Boolean(pendingKey)}
+              onClick={applyEndpointPresets}
+              type="button"
+            >
+              Apply Suite Presets
+            </button>
             <button
               className="secondary-button"
               disabled={Boolean(pendingKey)}
