@@ -1,10 +1,14 @@
 # Module Manifest
 
-Generated from `tenra Registry/contracts/handoff-catalog.json` by `tenra Registry/scripts/generate-suite-contract-docs.mjs`.
+Generated from `tenra Hub/contracts/handoff-catalog.json` by `tenra Hub/scripts/generate-suite-contract-docs.mjs`.
 
 ## Standalone Mode
 
 Runs as a complete lead discovery and opportunity review app with local lead inbox, candidate details, outreach context, and run controls.
+
+## Repository Path
+
+`business/acquisition/tenra Scout`
 
 ## Required Suite Dependencies
 
